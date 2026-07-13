@@ -7,10 +7,21 @@ import { renderMarkdown, escapeHtml, timeShort } from './markdown.js';
 import { P, has } from './permbits.js';
 
 const $ = (id) => document.getElementById(id);
-const EMOJIS = ['👍','❤️','😂','😮','😢','🔥','🎉','👀','💯','😅','🤔','👌','🫡','☠️','🍿','🍺'];
 const GROUP_MS = 5 * 60 * 1000;
 
-export function createChat({ rtc, getMe, getUsers, getRoles, getChannel, onIncoming, onRead }) {
+/** Curated unicode set for the picker + :name: autocomplete. */
+const UNICODE_EMOJI = {
+  'smileys': [['😀','grin'],['😁','beam'],['😂','joy'],['🤣','rofl'],['😊','smile'],['😉','wink'],['😍','heart_eyes'],['🥰','smiling_hearts'],['😘','kiss'],['😎','cool'],['🤔','thinking'],['🙃','upside_down'],['😅','sweat_smile'],['😭','sob'],['😢','cry'],['😡','rage'],['🥺','pleading'],['😴','sleeping'],['🤯','mind_blown'],['🥳','party'],['😱','scream'],['🤢','nauseated'],['🤡','clown'],['💀','skull'],['☠️','skull_bones'],['👻','ghost'],['🤖','robot'],['😈','smiling_imp']],
+  'gestures': [['👍','thumbsup'],['👎','thumbsdown'],['👌','ok_hand'],['✌️','victory'],['🤞','fingers_crossed'],['🤘','metal'],['🤙','call_me'],['👏','clap'],['🙌','raised_hands'],['🤝','handshake'],['🙏','pray'],['💪','muscle'],['👀','eyes'],['🫡','salute'],['🖕','middle_finger'],['👉','point_right'],['✋','raised_hand'],['🤌','pinched']],
+  'hearts': [['❤️','heart'],['🧡','orange_heart'],['💛','yellow_heart'],['💚','green_heart'],['💙','blue_heart'],['💜','purple_heart'],['🖤','black_heart'],['💔','broken_heart'],['💯','100'],['💢','anger'],['💥','boom'],['✨','sparkles'],['⭐','star'],['🔥','fire'],['❄️','snowflake'],['⚡','zap']],
+  'things': [['🎉','tada'],['🎊','confetti'],['🏆','trophy'],['🥇','gold'],['🎮','video_game'],['🕹️','joystick'],['🎲','dice'],['🎧','headphones'],['🎵','music_note'],['🎶','notes'],['💰','moneybag'],['💎','gem'],['🔫','pistol'],['🗡️','dagger'],['🛡️','shield'],['🔑','key'],['💣','bomb'],['🚀','rocket'],['⚙️','gear'],['🧠','brain'],['📌','pin'],['⏰','alarm'],['✅','check'],['❌','x'],['❓','question'],['⚠️','warning']],
+  'food': [['🍕','pizza'],['🍔','burger'],['🌮','taco'],['🍜','ramen'],['🍣','sushi'],['🍺','beer'],['🍻','cheers'],['☕','coffee'],['🥤','cup'],['🍿','popcorn'],['🍩','donut'],['🍪','cookie'],['🎂','cake'],['🍉','watermelon'],['🥓','bacon'],['🌶️','hot_pepper']],
+  'nature': [['🐶','dog'],['🐱','cat'],['🦊','fox'],['🐸','frog'],['🐢','turtle'],['🦀','crab'],['🐙','octopus'],['🦄','unicorn'],['🐉','dragon'],['🌙','moon'],['☀️','sun'],['🌧️','rain'],['🌈','rainbow'],['🌲','tree'],['🍀','clover'],['🌊','wave']]
+};
+const UNICODE_FLAT = Object.values(UNICODE_EMOJI).flat();
+
+export function createChat({ rtc, getMe, getUsers, getRoles, getChannel,
+                             getEmojis, getCaps, getBaseUrl, onIncoming, onRead }) {
   const st = {
     channelId: null,
     oldestId: null,
@@ -41,6 +52,34 @@ export function createChat({ rtc, getMe, getUsers, getRoles, getChannel, onIncom
   }
 
   const myPerms = () => getChannel(st.channelId)?.myPerms ?? 0;
+
+  const emojiMap = () =>
+    new Map((getEmojis() || []).map((e) => [e.name, e]));
+  const emojiById = (id) => (getEmojis() || []).find((e) => e.id === id) || null;
+  const emojiCtx = () => ({ map: emojiMap(), base: getBaseUrl() });
+
+  /** Bare CDN link from an approved media host → inline gif. */
+  function mediaUrl(content) {
+    const t = String(content).trim();
+    if (!t || /\s/.test(t)) return null;
+    try {
+      const u = new URL(t);
+      const hosts = getCaps()?.mediaHosts || [];
+      if (hosts.includes(u.hostname.toLowerCase())) return t;
+    } catch { /* not a url */ }
+    return null;
+  }
+
+  function chipLabel(emoji, count) {
+    if (emoji.startsWith('ce:')) {
+      const e = emojiById(emoji.slice(3));
+      const img = e
+        ? `<img class="cemoji chip" src="${getBaseUrl()}/emoji/${e.id}.${e.ext}" alt=":${escapeHtml(e.name)}:" draggable="false">`
+        : '❔';
+      return `${img} ${count}`;
+    }
+    return `${escapeHtml(emoji)} ${count}`;
+  }
   const nearBottom = () => {
     const el = $('chat-scroll');
     return el.scrollHeight - el.scrollTop - el.clientHeight < 90;
@@ -60,7 +99,7 @@ export function createChat({ rtc, getMe, getUsers, getRoles, getChannel, onIncom
       const mine = st.myReacts.has(`${m.id}:${r.emoji}`);
       const chip = document.createElement('button');
       chip.className = 'react-chip' + (mine ? ' mine' : '');
-      chip.textContent = `${r.emoji} ${r.count}`;
+      chip.innerHTML = chipLabel(r.emoji, r.count);
       chip.addEventListener('click', () =>
         rtc.request(mine ? 'react:remove' : 'react:add',
           { messageId: m.id, emoji: r.emoji })
@@ -111,7 +150,7 @@ export function createChat({ rtc, getMe, getUsers, getRoles, getChannel, onIncom
       b.addEventListener('click', fn);
       bar.appendChild(b);
     };
-    btn('😀', 'React', (e) => openEmojiPicker(e.currentTarget, m.id));
+    btn('😀', 'React', (e) => openPicker(e.currentTarget, 'react', m.id));
     btn('↩', 'Reply', () => setReply(m));
     if (m.authorId === me().id) btn('✏', 'Edit', () => startEdit(m.id));
     if (has(myPerms(), P.MANAGE_MESSAGES)) {
@@ -161,8 +200,22 @@ export function createChat({ rtc, getMe, getUsers, getRoles, getChannel, onIncom
 
     const body = document.createElement('div');
     body.className = 'msg-body';
-    body.innerHTML = renderMarkdown(m.content, names(), me().name) +
-      (m.editedAt ? ' <span class="edited">(edited)</span>' : '');
+    const media = mediaUrl(m.content);
+    if (media) {
+      const a = document.createElement('a');
+      a.href = media; a.target = '_blank'; a.rel = 'noreferrer noopener';
+      a.className = 'chat-gif-wrap';
+      const img = document.createElement('img');
+      img.className = 'chat-gif';
+      img.src = media;
+      img.loading = 'lazy';
+      img.alt = 'gif';
+      a.appendChild(img);
+      body.appendChild(a);
+    } else {
+      body.innerHTML = renderMarkdown(m.content, names(), me().name, emojiCtx()) +
+        (m.editedAt ? ' <span class="edited">(edited)</span>' : '');
+    }
     el.appendChild(body);
 
     el.appendChild(previewCards(m));
@@ -349,33 +402,218 @@ export function createChat({ rtc, getMe, getUsers, getRoles, getChannel, onIncom
     ta.style.height = Math.min(ta.scrollHeight, 180) + 'px';
   }
 
-  /* ───────────────────────── emoji picker ───────────────────────── */
+  /* ───────────────── combined emoji / GIF picker ─────────────────── */
 
-  function openEmojiPicker(anchor, messageId) {
-    const pop = $('emoji-pop');
-    pop.textContent = '';
-    for (const e of EMOJIS) {
-      const b = document.createElement('button');
-      b.textContent = e;
-      b.addEventListener('click', () => {
-        rtc.request('react:add', { messageId, emoji: e })
-          .then(() => st.myReacts.add(`${messageId}:${e}`))
-          .catch(() => {});
-        pop.classList.add('hidden');
-      });
-      pop.appendChild(b);
+  const picker = { mode: 'insert', messageId: null, tab: 'emoji', gifProvider: null };
+
+  function pickEmoji(token, isCustom) {
+    if (picker.mode === 'react' && picker.messageId) {
+      const emoji = isCustom ? `ce:${token}` : token;
+      rtc.request('react:add', { messageId: picker.messageId, emoji })
+        .then(() => st.myReacts.add(`${picker.messageId}:${emoji}`))
+        .catch(() => {});
+      closePicker();
+    } else {
+      insertAtCaret(isCustom ? `:${emojiById(token)?.name}:` : token);
     }
-    const r = anchor.getBoundingClientRect();
-    pop.style.left = Math.min(r.left, window.innerWidth - 260) + 'px';
-    pop.style.top = Math.max(8, r.top - 78) + 'px';
+  }
+
+  function insertAtCaret(text) {
+    const input = $('chat-input');
+    const a = input.selectionStart ?? input.value.length;
+    const b = input.selectionEnd ?? a;
+    input.value = input.value.slice(0, a) + text + input.value.slice(b);
+    const pos = a + text.length;
+    input.setSelectionRange(pos, pos);
+    input.focus();
+  }
+
+  function renderEmojiTab(pop) {
+    const body = pop.querySelector('.pk-body');
+    body.textContent = '';
+    const custom = getEmojis() || [];
+    if (custom.length) {
+      const head = document.createElement('div');
+      head.className = 'pk-cat';
+      head.textContent = 'server emojis';
+      body.appendChild(head);
+      const grid = document.createElement('div');
+      grid.className = 'pk-grid';
+      for (const e of custom) {
+        const b = document.createElement('button');
+        b.className = 'pk-emoji';
+        b.title = `:${e.name}:`;
+        b.innerHTML = `<img class="cemoji" src="${getBaseUrl()}/emoji/${e.id}.${e.ext}" alt=":${escapeHtml(e.name)}:" draggable="false">`;
+        b.addEventListener('click', () => pickEmoji(e.id, true));
+        grid.appendChild(b);
+      }
+      body.appendChild(grid);
+    }
+    for (const [cat, list] of Object.entries(UNICODE_EMOJI)) {
+      const head = document.createElement('div');
+      head.className = 'pk-cat';
+      head.textContent = cat;
+      body.appendChild(head);
+      const grid = document.createElement('div');
+      grid.className = 'pk-grid';
+      for (const [ch, name] of list) {
+        const b = document.createElement('button');
+        b.className = 'pk-emoji';
+        b.title = `:${name}:`;
+        b.textContent = ch;
+        b.addEventListener('click', () => pickEmoji(ch, false));
+        grid.appendChild(b);
+      }
+      body.appendChild(grid);
+    }
+  }
+
+  let gifTimer = null;
+  async function loadGifs(pop, q) {
+    const body = pop.querySelector('.pk-body');
+    body.innerHTML = '<div class="pk-note">searching…</div>';
+    try {
+      const { provider, results } = await rtc.request('gif:search',
+        { q, provider: picker.gifProvider });
+      picker.gifProvider = provider;
+      pop.querySelectorAll('.pk-prov').forEach((b) =>
+        b.classList.toggle('active', b.dataset.p === provider));
+      body.textContent = '';
+      if (!results.length) {
+        body.innerHTML = '<div class="pk-note">nothing found</div>';
+        return;
+      }
+      const grid = document.createElement('div');
+      grid.className = 'gif-grid';
+      for (const g of results) {
+        const b = document.createElement('button');
+        b.className = 'gif-cell';
+        const img = document.createElement('img');
+        img.src = g.preview; img.loading = 'lazy'; img.alt = 'gif';
+        b.appendChild(img);
+        b.addEventListener('click', async () => {
+          closePicker();
+          try {
+            await rtc.request('msg:send', { channelId: st.channelId, content: g.url });
+          } catch (err) { flashInputError(err.message); }
+        });
+        grid.appendChild(b);
+      }
+      body.appendChild(grid);
+    } catch (err) {
+      body.innerHTML = `<div class="pk-note">${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  function renderGifTab(pop) {
+    const body = pop.querySelector('.pk-body');
+    body.textContent = '';
+    loadGifs(pop, pop.querySelector('.pk-search').value.trim());
+  }
+
+  function openPicker(anchor, mode, messageId = null) {
+    const pop = $('picker-pop');
+    picker.mode = mode;
+    picker.messageId = messageId;
+    const providers = getCaps()?.gifProviders || [];
+    const gifOk = mode === 'insert' && providers.length > 0;
+    if (picker.tab === 'gif' && !gifOk) picker.tab = 'emoji';
+
+    pop.innerHTML =
+      `<div class="pk-tabs">` +
+      `<button class="pk-tab" data-t="emoji">Emoji</button>` +
+      (gifOk ? `<button class="pk-tab" data-t="gif">GIF</button>` : '') +
+      `</div>` +
+      `<div class="pk-provrow hidden">` +
+      providers.map((p) => `<button class="pk-prov" data-p="${p}">${p}</button>`).join('') +
+      `<input class="pk-search" type="text" placeholder="search gifs" spellcheck="false">` +
+      `</div>` +
+      `<div class="pk-body"></div>`;
+
+    const sync = () => {
+      pop.querySelectorAll('.pk-tab').forEach((b) =>
+        b.classList.toggle('active', b.dataset.t === picker.tab));
+      pop.querySelector('.pk-provrow').classList.toggle('hidden', picker.tab !== 'gif');
+      if (picker.tab === 'gif') renderGifTab(pop);
+      else renderEmojiTab(pop);
+    };
+    pop.querySelectorAll('.pk-tab').forEach((b) =>
+      b.addEventListener('click', () => { picker.tab = b.dataset.t; sync(); }));
+    pop.querySelectorAll('.pk-prov').forEach((b) =>
+      b.addEventListener('click', () => {
+        picker.gifProvider = b.dataset.p;
+        renderGifTab(pop);
+      }));
+    pop.querySelector('.pk-search').addEventListener('input', (e) => {
+      clearTimeout(gifTimer);
+      gifTimer = setTimeout(() => loadGifs(pop, e.target.value.trim()), 450);
+    });
+    sync();
+
     pop.classList.remove('hidden');
+    const r = anchor.getBoundingClientRect();
+    const w = pop.offsetWidth, h = pop.offsetHeight;
+    pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px';
+    pop.style.top = Math.max(8, r.top - h - 8) + 'px';
     const dismiss = (ev) => {
-      if (!pop.contains(ev.target)) {
-        pop.classList.add('hidden');
+      if (!pop.contains(ev.target) && ev.target !== anchor) {
+        closePicker();
         window.removeEventListener('mousedown', dismiss, true);
       }
     };
     setTimeout(() => window.addEventListener('mousedown', dismiss, true), 0);
+  }
+
+  function closePicker() { $('picker-pop').classList.add('hidden'); }
+
+  /* ─────────────────── :name: autocomplete ─────────────────────── */
+
+  const ac = { open: false, items: [], index: 0, start: 0 };
+
+  function updateAutocomplete() {
+    const input = $('chat-input');
+    const pop = $('emoji-ac');
+    const caret = input.selectionStart ?? input.value.length;
+    const before = input.value.slice(0, caret);
+    const m = before.match(/(?:^|\s):([a-z0-9_]{2,32})$/);
+    if (!m) { ac.open = false; pop.classList.add('hidden'); return; }
+    const q = m[1];
+    ac.start = caret - q.length - 1;
+    const custom = (getEmojis() || [])
+      .filter((e) => e.name.startsWith(q))
+      .map((e) => ({ kind: 'custom', e }));
+    const uni = UNICODE_FLAT
+      .filter(([, n]) => n.startsWith(q))
+      .map(([ch, n]) => ({ kind: 'uni', ch, n }));
+    ac.items = [...custom, ...uni].slice(0, 8);
+    if (!ac.items.length) { ac.open = false; pop.classList.add('hidden'); return; }
+    ac.index = 0;
+    ac.open = true;
+    pop.textContent = '';
+    ac.items.forEach((item, i) => {
+      const row = document.createElement('button');
+      row.className = 'ac-row' + (i === ac.index ? ' active' : '');
+      row.innerHTML = item.kind === 'custom'
+        ? `<img class="cemoji" src="${getBaseUrl()}/emoji/${item.e.id}.${item.e.ext}" alt="" draggable="false"> :${escapeHtml(item.e.name)}:`
+        : `<span class="ac-ch">${item.ch}</span> :${escapeHtml(item.n)}:`;
+      row.addEventListener('mousedown', (ev) => { ev.preventDefault(); applyAc(i); });
+      pop.appendChild(row);
+    });
+    pop.classList.remove('hidden');
+  }
+
+  function applyAc(i) {
+    const item = ac.items[i];
+    if (!item) return;
+    const input = $('chat-input');
+    const caret = input.selectionStart ?? input.value.length;
+    const insert = item.kind === 'custom' ? `:${item.e.name}: ` : `${item.ch} `;
+    input.value = input.value.slice(0, ac.start) + insert + input.value.slice(caret);
+    const pos = ac.start + insert.length;
+    input.setSelectionRange(pos, pos);
+    ac.open = false;
+    $('emoji-ac').classList.add('hidden');
+    input.focus();
   }
 
   /* ───────────────────── pins & search overlay ──────────────────── */
@@ -505,11 +743,23 @@ export function createChat({ rtc, getMe, getUsers, getRoles, getChannel, onIncom
     // Composer.
     const input = $('chat-input');
     input.addEventListener('keydown', (e) => {
+      if (ac.open) {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          ac.index = (ac.index + (e.key === 'ArrowDown' ? 1 : ac.items.length - 1)) % ac.items.length;
+          $('emoji-ac').querySelectorAll('.ac-row').forEach((r, i) =>
+            r.classList.toggle('active', i === ac.index));
+          return;
+        }
+        if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); applyAc(ac.index); return; }
+        if (e.key === 'Escape') { ac.open = false; $('emoji-ac').classList.add('hidden'); return; }
+      }
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
       if (e.key === 'Escape') clearReplyBar();
     });
     input.addEventListener('input', () => {
       autosize(input);
+      updateAutocomplete();
       const now = Date.now();
       if (input.value && now - st.lastTypingSent > 2500 && st.channelId) {
         st.lastTypingSent = now;
@@ -517,6 +767,14 @@ export function createChat({ rtc, getMe, getUsers, getRoles, getChannel, onIncom
       }
     });
     $('reply-cancel').addEventListener('click', clearReplyBar);
+    $('chat-emoji-btn').addEventListener('click', (e) => {
+      picker.tab = 'emoji';
+      openPicker(e.currentTarget, 'insert');
+    });
+    $('chat-gif-btn').addEventListener('click', (e) => {
+      picker.tab = 'gif';
+      openPicker(e.currentTarget, 'insert');
+    });
 
     // Scroll: pagination + read marking.
     $('chat-scroll').addEventListener('scroll', () => {
@@ -554,6 +812,10 @@ export function createChat({ rtc, getMe, getUsers, getRoles, getChannel, onIncom
     const input = $('chat-input');
     const canSend = has(p, P.SEND_MESSAGES);
     input.disabled = !canSend;
+    $('chat-emoji-btn').disabled = !canSend;
+    const providers = getCaps()?.gifProviders || [];
+    $('chat-gif-btn').classList.toggle('hidden', !providers.length);
+    $('chat-gif-btn').disabled = !canSend;
     input.placeholder = canSend
       ? `Message # ${getChannel(st.channelId)?.name || ''}`
       : 'You do not have permission to send messages here';

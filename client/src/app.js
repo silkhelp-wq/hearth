@@ -107,6 +107,7 @@ const state = {
   editingRole: null,
   accessDraft: null,      // roleId -> {perm -> 'inherit'|'allow'|'deny'}
   caps: {},               // server capabilities from hello
+  emojis: [],             // custom server emojis
   jb: null,               // jukebox state for the connected voice channel
   localMuted: new Map(),  // peerId -> previous volume (mute-for-me)
   pendingAfterHello: null // {voice, view} rejoin targets after reconnect
@@ -129,6 +130,9 @@ const chat = createChat({
   getUsers: () => state.users,
   getRoles: () => state.roles,
   getChannel: (id) => state.dirMap.get(id),
+  getEmojis: () => state.emojis,
+  getCaps: () => state.caps,
+  getBaseUrl: () => rtc.baseUrl,
   onIncoming,
   onRead
 });
@@ -243,6 +247,7 @@ function applyHello(h) {
   state.readState = h.readState || {};
   state.ownerClaimed = !!h.ownerClaimed;
   state.caps = h.caps || {};
+  state.emojis = h.emojis || [];
   $('server-name').textContent = h.serverName || 'Hearth';
   $('self-name').textContent = state.me.name;
 
@@ -938,6 +943,11 @@ function wireRaw() {
     updateEmptyStage('That hall was deleted.');
   });
 
+  rtc.onRaw('emoji:update', (list) => {
+    state.emojis = list || [];
+    renderServerPanel();
+  });
+
   rtc.onRaw('jukebox:update', (st) => {
     if (st?.channelId !== state.channelId) return;
     state.jb = st;
@@ -1178,6 +1188,95 @@ function renderServerPanel() {
     }
     rolesBox.appendChild(row);
   }
+
+  renderEmojiManager(bp);
+  renderStoragePanel(bp);
+}
+
+function renderEmojiManager(bp) {
+  const wrap = $('srv-emoji-wrap');
+  const canManage = has(bp, P.MANAGE_EMOJIS);
+  wrap.classList.toggle('hidden', !canManage && !state.emojis.length);
+  const box = $('srv-emojis');
+  box.textContent = '';
+  wrap.querySelector('.rail-add').classList.toggle('hidden', !canManage);
+  $('emoji-name').classList.toggle('hidden', !canManage);
+  if (!state.emojis.length) {
+    const d = document.createElement('div');
+    d.className = 'hint';
+    d.textContent = canManage
+      ? 'No custom emojis yet — name one, then hit + to pick a PNG or animated GIF.'
+      : 'No custom emojis yet.';
+    box.appendChild(d);
+  }
+  for (const e of state.emojis) {
+    const row = document.createElement('div');
+    row.className = 'emoji-row';
+    row.innerHTML =
+      `<img class="cemoji big" src="${rtc.baseUrl}/emoji/${e.id}.${e.ext}" alt="" draggable="false">` +
+      `<span class="mono">:${escapeHtml(e.name)}:</span>` +
+      `<span class="hint">${e.animated ? 'animated · ' : ''}${(e.bytes / 1024).toFixed(0)} KB</span>`;
+    if (canManage) {
+      const del = document.createElement('button');
+      del.className = 'srv-act danger';
+      del.textContent = 'delete';
+      del.addEventListener('click', () =>
+        rtc.request('emoji:delete', { id: e.id }).catch((err) => alert(err.message)));
+      row.appendChild(del);
+    }
+    box.appendChild(row);
+  }
+}
+
+async function uploadEmoji(file) {
+  const status = $('emoji-status');
+  const name = $('emoji-name').value.trim().toLowerCase();
+  if (!/^[a-z0-9_]{2,32}$/.test(name)) {
+    status.textContent = 'name first: 2-32 chars, a-z 0-9 _';
+    return;
+  }
+  const maxKB = state.caps.emojiMaxKB || 512;
+  if (file.size > maxKB * 1024) {
+    status.textContent = `too big — max ${maxKB} KB`;
+    return;
+  }
+  status.textContent = 'uploading…';
+  try {
+    const data = await file.arrayBuffer();
+    await rtc.request('emoji:add', { name, data });
+    $('emoji-name').value = '';
+    status.textContent = `:${name}: added`;
+    setTimeout(() => { status.textContent = ''; }, 2500);
+  } catch (err) {
+    status.textContent = err.message;
+  }
+}
+
+async function renderStoragePanel(bp) {
+  const wrap = $('srv-storage-wrap');
+  const admin = has(bp, P.ADMINISTRATOR);
+  wrap.classList.toggle('hidden', !admin);
+  if (!admin) return;
+  try {
+    const { settings: st2, usage } = await rtc.request('server:settings:get', {});
+    $('cap-chat').value = st2.chatCapMB;
+    $('cap-emoji').value = st2.emojiCapMB;
+    $('cap-preview').value = st2.previewCapMB;
+    const mb = (b) => (b / 1024 / 1024).toFixed(1);
+    $('storage-usage').textContent =
+      `in use — chat ${mb(usage.chatBytes)} MB · emojis ${mb(usage.emojiBytes)} MB · previews ${mb(usage.previewBytes)} MB`;
+  } catch { /* not admin anymore / transient */ }
+}
+
+async function saveStorage() {
+  try {
+    await rtc.request('server:settings:set', {
+      chatCapMB: Number($('cap-chat').value),
+      emojiCapMB: Number($('cap-emoji').value),
+      previewCapMB: Number($('cap-preview').value)
+    });
+    renderStoragePanel(myBasePerms());
+  } catch (err) { alert(err.message); }
 }
 
 const countBits = (n) => { let c = 0; while (n) { c += n & 1; n >>>= 1; } return c; };
@@ -1873,6 +1972,12 @@ function wire() {
     }
   });
   $('btn-claim-owner').addEventListener('click', () => claimOwner());
+  $('emoji-file').addEventListener('change', (e) => {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (f) uploadEmoji(f);
+  });
+  $('btn-save-storage').addEventListener('click', () => saveStorage());
 
   // share modal
   $('btn-share-cancel').addEventListener('click', () => $('modal-share').close());

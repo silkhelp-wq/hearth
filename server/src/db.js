@@ -97,6 +97,15 @@ CREATE TABLE IF NOT EXISTS link_previews (
   title TEXT, description TEXT, site_name TEXT,
   fetched_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS emojis (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  ext TEXT NOT NULL CHECK (ext IN ('png','gif','webp')),
+  animated INTEGER NOT NULL DEFAULT 0,
+  bytes INTEGER NOT NULL,
+  uploaded_by TEXT,
+  created_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS read_state (
   user_id TEXT NOT NULL,
   channel_id TEXT NOT NULL,
@@ -552,6 +561,95 @@ function savePreview(url, card) {
          card?.siteName ?? null, now());
 }
 
+/* ────────────────────────────── emojis ─────────────────────────────── */
+
+const EMOJI_NAME_RE = /^[a-z0-9_]{2,32}$/;
+
+function listEmojis() {
+  return db.prepare(
+    'SELECT id, name, ext, animated, bytes FROM emojis ORDER BY name').all();
+}
+
+function emojiByName(name) {
+  return db.prepare('SELECT * FROM emojis WHERE name = ?').get(name) || null;
+}
+
+function emojiById(id) {
+  return db.prepare('SELECT * FROM emojis WHERE id = ?').get(id) || null;
+}
+
+function addEmoji({ name, ext, animated, bytes, uploadedBy }) {
+  if (!EMOJI_NAME_RE.test(name)) {
+    throw new Error('emoji names are 2-32 chars: a-z, 0-9, underscore');
+  }
+  if (emojiByName(name)) throw new Error(`:${name}: already exists`);
+  const id = newId('e');
+  db.prepare(`INSERT INTO emojis (id, name, ext, animated, bytes, uploaded_by, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?)`)
+    .run(id, name, ext, animated ? 1 : 0, bytes, uploadedBy, now());
+  return emojiById(id);
+}
+
+function deleteEmoji(id) {
+  return db.prepare('DELETE FROM emojis WHERE id = ?').run(id).changes > 0;
+}
+
+const emojiTotalBytes = () =>
+  db.prepare('SELECT COALESCE(SUM(bytes),0) AS b FROM emojis').get().b;
+
+/* ───────────────────── live storage settings (kv) ──────────────────── */
+
+function getStorageSettings(defaults) {
+  const raw = kvGet('storage_settings');
+  const saved = raw ? JSON.parse(raw) : {};
+  return {
+    chatCapMB: clampMB(saved.chatCapMB ?? defaults.chatCapMB, 16, 102400),
+    emojiCapMB: clampMB(saved.emojiCapMB ?? defaults.emojiCapMB, 4, 4096),
+    previewCapMB: clampMB(saved.previewCapMB ?? defaults.previewCapMB, 1, 1024)
+  };
+}
+
+function setStorageSettings(next, defaults) {
+  const merged = getStorageSettings(defaults);
+  for (const k of ['chatCapMB', 'emojiCapMB', 'previewCapMB']) {
+    if (next[k] != null) merged[k] = next[k];
+  }
+  const clean = getStorageSettingsFrom(merged);
+  kvSet('storage_settings', JSON.stringify(clean));
+  return clean;
+}
+
+const clampMB = (v, min, max) =>
+  Math.min(Math.max(Math.round(Number(v) || 0), min), max);
+
+function getStorageSettingsFrom(o) {
+  return {
+    chatCapMB: clampMB(o.chatCapMB, 16, 102400),
+    emojiCapMB: clampMB(o.emojiCapMB, 4, 4096),
+    previewCapMB: clampMB(o.previewCapMB, 1, 1024)
+  };
+}
+
+/** Rough on-disk weight of the preview cache; prune oldest past the cap. */
+function previewCacheBytes() {
+  return db.prepare(
+    `SELECT COALESCE(SUM(LENGTH(url) + LENGTH(COALESCE(title,'')) +
+             LENGTH(COALESCE(description,'')) + LENGTH(COALESCE(site_name,'')) + 64), 0) AS b
+     FROM link_previews`).get().b;
+}
+
+function prunePreviews(capBytes) {
+  let deleted = 0;
+  while (previewCacheBytes() > capBytes) {
+    const info = db.prepare(
+      `DELETE FROM link_previews WHERE url IN (
+         SELECT url FROM link_previews ORDER BY fetched_at ASC LIMIT 200)`).run();
+    if (!info.changes) break;
+    deleted += info.changes;
+  }
+  return deleted;
+}
+
 /* ─────────────────────────────── prune ─────────────────────────────── */
 
 function dbSizeBytes() {
@@ -594,5 +692,7 @@ module.exports = {
   history, lastMessageIds, hydrateMessages,
   toggleReaction, setPin, listPins, markRead, readState,
   search, getPreview, savePreview,
+  listEmojis, emojiByName, emojiById, addEmoji, deleteEmoji, emojiTotalBytes,
+  getStorageSettings, setStorageSettings, previewCacheBytes, prunePreviews,
   dbSizeBytes, pruneToCap
 };

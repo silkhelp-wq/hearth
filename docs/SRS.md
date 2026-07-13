@@ -170,3 +170,12 @@ including the 10-user × 60-minute soak (TC-11).
 | FR-34 | Users with `SPEAK` in a voice channel SHALL be able to queue audio by URL; YouTube SHALL play directly, Spotify/Pandora links SHALL resolve by title to the best YouTube match; the host SHALL stream decoded opus into the channel via a PlainTransport producer heard synchronously by all members. |
 | FR-35 | The jukebox SHALL appear as a synthetic channel member with queue/skip (and pause on POSIX hosts) controls, a queue cap of 25, and SHALL self-disable when `yt-dlp`/`ffmpeg` are absent (capability advertised in hello). |
 | FR-36 | Right-clicking a member (rail or tile) SHALL open a menu with a per-listener volume slider and mute-for-me, plus server mute (`MUTE_MEMBERS`) and kick (`KICK_MEMBERS`) where permitted; the owner SHALL be exempt from moderation. |
+
+### 6.4 v0.4 additions — GIFs, emojis, storage
+
+| ID | Requirement |
+|---|---|
+| FR-37 | The server SHALL proxy GIF search to Tenor, GIPHY, and Imgur, each enabled only when its host-side key is configured; selected GIFs SHALL post as CDN URLs and clients SHALL inline-render bare links only from the server-advertised media-host allowlist. |
+| FR-38 | Users with `MANAGE_EMOJIS` SHALL upload custom emojis (PNG/GIF/WebP ≤512 KB, content-validated); emojis SHALL be usable as `:name:` tokens in messages (with autocomplete) and as reactions (`ce:<id>`), animated GIFs animating in place. |
+| FR-39 | Emoji uploads SHALL be refused once total emoji bytes exceed the live emoji cap. |
+| FR-40 | Administrators SHALL adjust chat, emoji, and preview-cache caps at runtime with clamped ranges and usage readouts; the prune loop SHALL honor the live values. |

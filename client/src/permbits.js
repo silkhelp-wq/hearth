@@ -12,10 +12,11 @@ export const P = {
   SPEAK:           1 << 8,
   MUTE_MEMBERS:    1 << 9,
   KICK_MEMBERS:    1 << 10,
-  ADMINISTRATOR:   1 << 11
+  ADMINISTRATOR:   1 << 11,
+  MANAGE_EMOJIS:   1 << 12
 };
 
-export const ALL = (1 << 12) - 1;
+export const ALL = (1 << 13) - 1;
 
 export const PERM_LABELS = [
   [P.VIEW_CHANNEL, 'View channels'],
@@ -29,6 +30,7 @@ export const PERM_LABELS = [
   [P.SPEAK, 'Speak in voice'],
   [P.MUTE_MEMBERS, 'Mute members'],
   [P.KICK_MEMBERS, 'Kick members'],
+  [P.MANAGE_EMOJIS, 'Manage emojis (upload, delete)'],
   [P.ADMINISTRATOR, 'Administrator (everything)']
 ];
 

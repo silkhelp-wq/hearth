@@ -26,10 +26,11 @@ const P = {
   SPEAK:           1 << 8,
   MUTE_MEMBERS:    1 << 9,
   KICK_MEMBERS:    1 << 10,
-  ADMINISTRATOR:   1 << 11
+  ADMINISTRATOR:   1 << 11,
+  MANAGE_EMOJIS:   1 << 12
 };
 
-const ALL = (1 << 12) - 1;
+const ALL = (1 << 13) - 1;
 
 const DEFAULT_EVERYONE =
   P.VIEW_CHANNEL | P.SEND_MESSAGES | P.EMBED_LINKS |

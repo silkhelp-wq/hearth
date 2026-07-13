@@ -129,6 +129,8 @@
         </div>
         <div class="chat-input-row">
           <textarea id="chat-input" rows="1" placeholder="Message"></textarea>
+          <button id="chat-gif-btn" class="icon-btn input-btn hidden" title="GIFs">GIF</button>
+          <button id="chat-emoji-btn" class="icon-btn input-btn" title="Emoji">😊</button>
         </div>
       </div>
 
@@ -145,7 +147,8 @@
     <div id="audio-sink" aria-hidden="true"></div>
   </section>
 
-  <div id="emoji-pop" class="emoji-pop hidden"></div>
+  <div id="picker-pop" class="picker-pop hidden"></div>
+  <div id="emoji-ac" class="emoji-ac hidden"></div>
   <div id="ctx-menu" class="ctx-menu hidden"></div>
 
   <!-- ═══════════════ Create channel ═══════════════ -->
@@ -350,6 +353,39 @@
           </div>
           <div id="srv-roles" class="srv-list"></div>
         </div>
+      </div>
+
+      <div id="srv-emoji-wrap" class="srv-section hidden">
+        <div class="rail-label mono">custom emojis
+          <label class="rail-add" title="Upload emoji (PNG / GIF / WebP, animated welcome)">+
+            <input id="emoji-file" type="file" accept=".png,.gif,.webp,image/png,image/gif,image/webp" hidden>
+          </label>
+        </div>
+        <div class="net-row slim">
+          <input id="emoji-name" type="text" maxlength="32" placeholder="emoji_name (then pick a file)" spellcheck="false" />
+          <span id="emoji-status" class="hint"></span>
+        </div>
+        <div id="srv-emojis" class="emoji-manager"></div>
+      </div>
+
+      <div id="srv-storage-wrap" class="srv-section hidden">
+        <div class="rail-label mono">storage caps</div>
+        <p class="hint">GIFs from the picker are hotlinked from Tenor / GIPHY / Imgur CDNs —
+        they use <b>zero</b> server storage. These caps govern what the server actually keeps.</p>
+        <div class="grid-3">
+          <label class="field slim"><span>Chat history (MB)</span>
+            <input type="number" id="cap-chat" min="16" max="102400" /></label>
+          <label class="field slim"><span>Custom emojis (MB)</span>
+            <input type="number" id="cap-emoji" min="4" max="4096" /></label>
+          <label class="field slim"><span>Link-preview cache (MB)</span>
+            <input type="number" id="cap-preview" min="1" max="1024" /></label>
+        </div>
+        <div class="net-row">
+          <button id="btn-save-storage" class="btn small primary">Save caps</button>
+          <span id="storage-usage" class="hint mono"></span>
+        </div>
+        <p class="hint">Chat past its cap prunes oldest-first (pins included). A full emoji
+        cap blocks new uploads until raised or cleared.</p>
       </div>
     </section>
   </dialog>

@@ -119,8 +119,12 @@ function attachSocket(io, socket, { enqueueUnfurl }) {
   });
 
   const react = (on) => guarded(async ({ messageId, emoji }) => {
-    emoji = String(emoji ?? '').slice(0, 8);
-    if (!emoji || /[<>&"'\s]/.test(emoji)) throw new Error('bad emoji');
+    emoji = String(emoji ?? '').slice(0, 40);
+    if (emoji.startsWith('ce:')) {
+      if (!db.emojiById(emoji.slice(3))) throw new Error('unknown emoji');
+    } else if (!emoji || emoji.length > 8 || /[<>&"'\s:]/.test(emoji)) {
+      throw new Error('bad emoji');
+    }
     const raw = db.getRawMessage(messageId);
     if (!raw) throw new Error('unknown message');
     need(perms(raw.channel_id), P.VIEW_CHANNEL, 'you cannot see that channel');

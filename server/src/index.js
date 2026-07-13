@@ -11,6 +11,8 @@
 
 const http = require('http');
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const express = require('express');
 const { Server } = require('socket.io');
 
@@ -21,6 +23,7 @@ const room = require('./room');
 const chat = require('./chat');
 const unfurl = require('./unfurl');
 const jukebox = require('./jukebox');
+const gifs = require('./gifs');
 const { P, ALL, has } = require('./perms');
 
 const SELFTEST = process.argv.includes('--selftest');
@@ -36,6 +39,8 @@ function buildApp() {
   app.disable('x-powered-by');
 
   app.get('/health', (_req, res) => res.json({ ok: true, version: VERSION }));
+  app.use('/emoji', express.static(path.join(config.dataDir, 'emoji'),
+    { maxAge: '30d', immutable: true, fallthrough: false }));
   app.get('/info', (_req, res) => res.json({
     name: config.serverName,
     version: VERSION,
@@ -149,6 +154,20 @@ async function main() {
   const httpServer = http.createServer(app);
   const io = new Server(httpServer, { cors: { origin: '*' }, maxHttpBufferSize: 1e6 });
   const enqueueUnfurl = makeEnqueueUnfurl(io);
+  fs.mkdirSync(path.join(config.dataDir, 'emoji'), { recursive: true });
+
+  // Rolling prune, driven by the LIVE storage settings (owner-editable).
+  const prune = () => {
+    try {
+      const st = db.getStorageSettings(config.storage);
+      const r = db.pruneToCap(st.chatCapMB * 1024 * 1024, config.chat.pruneBatch);
+      if (r.deleted) {
+        console.log(`[prune] removed ${r.deleted} old messages; db now ${(r.size / 1e6).toFixed(1)} MB`);
+      }
+      const pv = db.prunePreviews(st.previewCapMB * 1024 * 1024);
+      if (pv) console.log(`[prune] dropped ${pv} cached link previews`);
+    } catch (err) { console.error('[prune]', err.message); }
+  };
 
   // Identity: device token in the socket handshake. New token = new user.
   io.use((socket, next) => {
@@ -183,10 +202,14 @@ async function main() {
       readState: db.readState(user.id),
       ownerClaimed: db.ownerClaimed(),
       serverName: config.serverName,
+      emojis: db.listEmojis(),
       caps: {
         maxMessageLen: config.chat.maxMessageLen,
         jukebox: jukebox.available(),
-        jukeboxPause: jukebox.available() && jukebox.canPause()
+        jukeboxPause: jukebox.available() && jukebox.canPause(),
+        gifProviders: gifs.providers(),
+        emojiMaxKB: config.storage.emojiMaxKB,
+        mediaHosts: gifs.MEDIA_HOSTS
       }
     });
 
@@ -287,6 +310,85 @@ async function main() {
       return { ok: true };
     }));
 
+    /* ---- emojis / gifs / storage ---- */
+
+    const MAGIC = {
+      gif: (b) => b.length > 6 && b.toString('ascii', 0, 4) === 'GIF8',
+      png: (b) => b.length > 8 && b[0] === 0x89 && b.toString('ascii', 1, 4) === 'PNG',
+      webp: (b) => b.length > 12 && b.toString('ascii', 0, 4) === 'RIFF' &&
+                   b.toString('ascii', 8, 12) === 'WEBP'
+    };
+
+    socket.on('emoji:add', guarded(async ({ name, data }) => {
+      if (!has(db.permsFor(user.id), P.MANAGE_EMOJIS)) {
+        throw new Error('no permission to manage emojis');
+      }
+      const buf = Buffer.isBuffer(data) ? data : Buffer.from(data || []);
+      if (!buf.length) throw new Error('empty file');
+      if (buf.length > config.storage.emojiMaxKB * 1024) {
+        throw new Error(`emoji too big (max ${config.storage.emojiMaxKB} KB)`);
+      }
+      const ext = MAGIC.gif(buf) ? 'gif' : MAGIC.png(buf) ? 'png'
+        : MAGIC.webp(buf) ? 'webp' : null;
+      if (!ext) throw new Error('emojis must be PNG, GIF, or WebP');
+
+      const st = db.getStorageSettings(config.storage);
+      if (db.emojiTotalBytes() + buf.length > st.emojiCapMB * 1024 * 1024) {
+        throw new Error(`emoji storage is full (${st.emojiCapMB} MB cap — raise it in Storage settings or delete some)`);
+      }
+      const emoji = db.addEmoji({
+        name: String(name || '').trim().toLowerCase(),
+        ext, animated: ext !== 'png', bytes: buf.length, uploadedBy: user.id
+      });
+      fs.mkdirSync(path.join(config.dataDir, 'emoji'), { recursive: true });
+      fs.writeFileSync(path.join(config.dataDir, 'emoji', `${emoji.id}.${ext}`), buf);
+      io.emit('emoji:update', db.listEmojis());
+      return { emoji };
+    }));
+
+    socket.on('emoji:delete', guarded(async ({ id }) => {
+      if (!has(db.permsFor(user.id), P.MANAGE_EMOJIS)) {
+        throw new Error('no permission to manage emojis');
+      }
+      const emoji = db.emojiById(id);
+      if (!emoji) throw new Error('unknown emoji');
+      db.deleteEmoji(id);
+      try { fs.unlinkSync(path.join(config.dataDir, 'emoji', `${emoji.id}.${emoji.ext}`)); }
+      catch { /* already gone */ }
+      io.emit('emoji:update', db.listEmojis());
+      return { ok: true };
+    }));
+
+    socket.on('gif:search', guarded(async ({ q, provider }) =>
+      gifs.search(q, provider)));
+
+    const needAdmin = () => {
+      if (!has(db.permsFor(user.id), P.ADMINISTRATOR)) {
+        throw new Error('server settings need Administrator');
+      }
+    };
+
+    socket.on('server:settings:get', guarded(async () => {
+      needAdmin();
+      return {
+        settings: db.getStorageSettings(config.storage),
+        usage: {
+          chatBytes: db.dbSizeBytes(),
+          emojiBytes: db.emojiTotalBytes(),
+          previewBytes: db.previewCacheBytes()
+        }
+      };
+    }));
+
+    socket.on('server:settings:set', guarded(async (next) => {
+      needAdmin();
+      const settings = db.setStorageSettings(next || {}, config.storage);
+      prune();
+      console.log(`[settings] storage caps → chat ${settings.chatCapMB}MB, ` +
+        `emoji ${settings.emojiCapMB}MB, previews ${settings.previewCapMB}MB (by ${user.name})`);
+      return { settings };
+    }));
+
     socket.on('disconnect', () => {
       const set = online.get(user.id);
       set?.delete(socket.id);
@@ -295,15 +397,6 @@ async function main() {
     });
   });
 
-  // Rolling prune: keep chat under the cap, oldest first.
-  const prune = () => {
-    try {
-      const r = db.pruneToCap(config.chat.capBytes, config.chat.pruneBatch);
-      if (r.deleted) {
-        console.log(`[prune] removed ${r.deleted} old messages; db now ${(r.size / 1e6).toFixed(1)} MB`);
-      }
-    } catch (err) { console.error('[prune]', err.message); }
-  };
   prune();
   setInterval(prune, config.chat.pruneIntervalMs).unref();
 
@@ -410,6 +503,35 @@ async function selftest() {
     assert(jukebox.titleToQuery('Losing It - song and lyrics by FISHER | Spotify')
       === 'Losing It FISHER', 'spotify title cleaned');
     ok('jukebox link classification');
+
+    step = 'emojis + storage settings';
+    const em = db.addEmoji({ name: 'pog', ext: 'gif', animated: true, bytes: 1000, uploadedBy: u.id });
+    assert(db.emojiByName('pog')?.id === em.id, 'emoji lookup');
+    let threw = false;
+    try { db.addEmoji({ name: 'pog', ext: 'png', animated: false, bytes: 1, uploadedBy: u.id }); }
+    catch { threw = true; }
+    assert(threw, 'duplicate emoji name rejected');
+    threw = false;
+    try { db.addEmoji({ name: 'Bad Name!', ext: 'png', animated: false, bytes: 1, uploadedBy: u.id }); }
+    catch { threw = true; }
+    assert(threw, 'invalid emoji name rejected');
+    assert(db.emojiTotalBytes() === 1000, 'emoji byte accounting');
+    const msg2 = db.insertMessage({
+      channelId: general.id, authorId: u.id,
+      content: 'post-prune reaction target', replyTo: null, urls: []
+    });
+    const rx = db.toggleReaction(msg2.id, u.id, `ce:${em.id}`, true);
+    assert(rx.some((r) => r.emoji === `ce:${em.id}`), 'custom-emoji reaction stored');
+    assert(db.deleteEmoji(em.id), 'emoji delete');
+
+    const st1 = db.setStorageSettings({ chatCapMB: 2048, emojiCapMB: 1, previewCapMB: 5 }, config.storage);
+    assert(st1.chatCapMB === 2048 && st1.emojiCapMB === 4, 'settings persist + clamp to floor');
+    assert(db.getStorageSettings(config.storage).chatCapMB === 2048, 'settings reload');
+    db.savePreview('https://example.com/pv', { url: 'x', title: 'y'.repeat(200), description: 'z'.repeat(200), siteName: 's' });
+    assert(db.prunePreviews(1) >= 1, 'preview cache prunes past cap');
+    assert(Array.isArray(require('./gifs').providers()) &&
+      require('./gifs').providers().length === 0, 'gif providers gated on keys');
+    ok('emojis, custom reactions, live storage settings, preview prune');
 
     const { spawnSync, spawn } = require('child_process');
     const hasFfmpeg = (() => {

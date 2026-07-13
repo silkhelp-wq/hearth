@@ -31,6 +31,13 @@ rides on your [Tailscale](https://tailscale.com) tailnet.
   Needs `yt-dlp` + `ffmpeg` on the host; auto-hides otherwise.
 - **Right-click anyone** for a volume slider, mute-for-me, and (permission-
   gated) server mute / kick
+- **GIF picker** (v0.4) — Tenor, GIPHY, and Imgur tabs (enable each with a
+  free API key on the host); GIFs post as CDN links and use zero server
+  storage
+- **Custom emojis** (v0.4) — upload PNG / animated GIF / WebP, use them as
+  `:name:` in messages (with autocomplete) and as reactions, Discord-style
+- **Live storage caps** — the owner tunes chat history, emoji storage, and
+  preview-cache sizes from Settings → Server, with usage readouts
 - **Cross-platform**: Linux, Windows, macOS (Electron)
 
 ## Quick start (host, ~5 minutes)

@@ -76,7 +76,12 @@ curl http://127.0.0.1:4443/health   # {"ok":true,...}
 | `HEARTH_ANNOUNCED_IP` | autodetect | set only if autodetect picks the wrong interface |
 | `HEARTH_NAME` | Hearth | shown in every client's rail |
 | `HEARTH_DATA_DIR` | `server/data` | SQLite database + state (back this up if you care about chat history) |
-| `HEARTH_CHAT_CAP_MB` | 1024 | chat DB cap — oldest messages pruned past it, pins included |
+| `HEARTH_CHAT_CAP_MB` | 1024 | default chat cap (owner can change live in-app) |
+| `HEARTH_EMOJI_CAP_MB` | 64 | default custom-emoji storage cap (live-editable) |
+| `HEARTH_PREVIEW_CAP_MB` | 32 | default link-preview cache cap (live-editable) |
+| `HEARTH_TENOR_KEY` | — | enables the Tenor GIF tab (free key: developers.google.com/tenor) |
+| `HEARTH_GIPHY_KEY` | — | enables the GIPHY tab (free key: developers.giphy.com) |
+| `HEARTH_IMGUR_CLIENT_ID` | — | enables the Imgur tab (free: api.imgur.com/oauth2/addclient) |
 
 Channels: `server/channels.json` seeds the voice list on **first boot only**
 (the database is the source of truth afterwards). From then on, channels are

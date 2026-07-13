@@ -60,6 +60,21 @@ module.exports = {
     pruneIntervalMs: 30 * 60 * 1000
   },
 
+  storage: {
+    // Env values are DEFAULTS; the owner can change these live in
+    // Settings -> Server -> Storage (persisted in the kv table).
+    chatCapMB: Number(process.env.HEARTH_CHAT_CAP_MB || 1024),
+    emojiCapMB: Number(process.env.HEARTH_EMOJI_CAP_MB || 64),
+    previewCapMB: Number(process.env.HEARTH_PREVIEW_CAP_MB || 32),
+    emojiMaxKB: 512
+  },
+
+  gifs: {
+    tenorKey: process.env.HEARTH_TENOR_KEY || '',
+    giphyKey: process.env.HEARTH_GIPHY_KEY || '',
+    imgurClientId: process.env.HEARTH_IMGUR_CLIENT_ID || ''
+  },
+
   unfurl: {
     timeoutMs: 5000,
     maxBytes: 512 * 1024,

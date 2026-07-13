@@ -113,3 +113,8 @@ extract for any failure. File issues with TC ID in the title.
 | TC-34 | Jukebox E2E | Two clients in a hall; paste a YouTube link | Both hear the same audio in sync; 🎵 Jukebox row appears; skip advances; queue lists pending tracks |
 | TC-35 | Link resolution | Paste a Spotify track link | Title resolves, YouTube match plays, now-playing shows "via spotify→youtube"; garbage input errors cleanly |
 | TC-36 | Member menu | Right-click a peer and the jukebox | Volume slider changes only local playback; mute-for-me toggles; server mute/kick present only with perms; owner shows neither |
+
+| TC-37 | GIF flow | Set a Tenor key, search, click a GIF | Posts inline for everyone; provider tabs match configured keys; no keys → GIF button absent |
+| TC-38 | Custom emoji | Upload an animated GIF as :party:, type :par → autocomplete, react with it | Animates inline and jumbo when alone; reaction chip shows the image; non-managers see no upload UI |
+| TC-39 | Emoji cap | Set emoji cap to 4 MB, upload past it | Upload refused with a clear message until cap raised or emojis deleted |
+| TC-40 | Live caps | Change chat cap as admin, save | Usage readout refreshes; prune honors new value without restart; non-admins see no Storage section |

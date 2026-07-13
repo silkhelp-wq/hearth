@@ -209,3 +209,21 @@ peer — the rail row, speaking ring, per-listener volume, and deafen all work
 with zero special cases. Queue/skip/pause are gated on `SPEAK` in that
 channel; pause is SIGSTOP/SIGCONT (Linux/macOS hosts). The session tears
 down when the queue drains or the last human leaves.
+
+### GIFs, custom emojis, live storage (v0.4)
+
+**GIF picker:** the server proxies search to Tenor / GIPHY / Imgur using
+host-side API keys (never shipped to clients); a pick posts the CDN URL as a
+normal message, which clients render inline only for the approved media-host
+allowlist. Nothing is stored server-side.
+
+**Custom emojis:** PNG / animated GIF / WebP uploads (≤512 KB, magic-byte
+validated) live in `data/emoji/` behind an immutable-cache static route, with
+a `MANAGE_EMOJIS` permission bit (1<<12). Messages carry plain `:name:`
+tokens; clients render them (jumbo when the message is emoji-only). Reactions
+store `ce:<id>` tokens next to unicode ones.
+
+**Live storage settings:** chat / emoji / preview caps persist in the kv
+table (env values are just defaults), editable by Administrators in
+Settings → Server with live usage readouts; the prune loop and the emoji
+upload gate read the current values every pass.

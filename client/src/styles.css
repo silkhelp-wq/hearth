@@ -842,3 +842,93 @@ input[type="range"] { accent-color: var(--steel); width: 180px; }
 .ctx-slider { display: flex; flex-direction: column; gap: 4px; padding: 6px 10px 8px; }
 .ctx-slider span { font-size: 11px; color: var(--ash); }
 .ctx-slider input { width: 100%; }
+
+/* ═══════════════ picker (emoji + GIF), autocomplete, media ═══════════════ */
+
+.input-btn { font-size: 15px; align-self: flex-end; margin-bottom: 4px; }
+#chat-gif-btn { font-size: 10.5px; font-weight: 800; letter-spacing: 0.03em; border: 1px solid var(--seam); border-radius: 5px; padding: 5px 6px; }
+.chat-input-row { display: flex; gap: 6px; align-items: flex-end; }
+.chat-input-row textarea { flex: 1; }
+
+.picker-pop {
+  position: fixed; z-index: 65; width: 360px;
+  background: var(--panel); border: 1px solid var(--seam);
+  border-radius: 12px; box-shadow: 0 14px 34px rgba(0, 0, 0, 0.6);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.pk-tabs { display: flex; gap: 2px; padding: 8px 8px 0; }
+.pk-tab {
+  font: inherit; font-size: 12.5px; font-weight: 700;
+  background: none; border: none; color: var(--ash);
+  padding: 6px 12px; border-radius: 7px; cursor: pointer;
+}
+.pk-tab.active { color: var(--parchment); background: var(--panel-2); }
+.pk-provrow { display: flex; gap: 4px; align-items: center; padding: 8px 10px 0; }
+.pk-prov {
+  font-size: 10.5px; text-transform: capitalize; cursor: pointer;
+  padding: 3px 9px; border-radius: 8px; color: var(--ash);
+  background: none; border: 1px solid var(--seam);
+}
+.pk-prov.active { color: var(--ember); border-color: var(--ember); }
+.pk-search {
+  flex: 1; min-width: 0; padding: 5px 9px; font-size: 12px;
+  background: var(--panel-2); border: 1px solid var(--seam);
+  border-radius: 6px; color: var(--parchment);
+}
+.pk-search:focus { outline: none; border-color: var(--steel); }
+.pk-body { max-height: 320px; overflow-y: auto; padding: 8px 10px 10px; }
+.pk-cat { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ash); margin: 8px 2px 4px; }
+.pk-grid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 2px; }
+.pk-emoji {
+  font-size: 19px; background: none; border: none; cursor: pointer;
+  padding: 4px 0; border-radius: 6px; display: flex; align-items: center; justify-content: center;
+}
+.pk-emoji:hover { background: var(--panel-2); }
+.pk-note { padding: 14px; font-size: 12px; color: var(--ash); }
+
+.gif-grid { column-count: 2; column-gap: 6px; }
+.gif-cell {
+  display: block; width: 100%; margin: 0 0 6px; padding: 0;
+  background: var(--panel-2); border: 1px solid var(--seam);
+  border-radius: 8px; overflow: hidden; cursor: pointer;
+  break-inside: avoid;
+}
+.gif-cell img { display: block; width: 100%; }
+.gif-cell:hover { border-color: var(--ember); }
+
+.emoji-ac {
+  position: fixed; z-index: 66; min-width: 240px; max-width: 340px;
+  background: var(--panel); border: 1px solid var(--seam);
+  border-radius: 10px; padding: 4px; box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55);
+}
+.ac-row {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 6px 10px; font-size: 12.5px; font-family: var(--font-mono);
+  color: var(--parchment); background: none; border: none;
+  border-radius: 6px; cursor: pointer; text-align: left;
+}
+.ac-row.active, .ac-row:hover { background: var(--panel-2); }
+.ac-ch { font-size: 17px; }
+
+.cemoji { width: 22px; height: 22px; object-fit: contain; vertical-align: -5px; }
+.cemoji.jumbo { width: 44px; height: 44px; vertical-align: -10px; }
+.cemoji.chip { width: 16px; height: 16px; vertical-align: -3px; }
+.cemoji.big { width: 30px; height: 30px; }
+
+.chat-gif-wrap { display: inline-block; margin: 2px 0; }
+.chat-gif {
+  display: block; max-width: min(340px, 80%); max-height: 260px;
+  border-radius: 8px; border: 1px solid var(--seam);
+}
+
+/* server tab: emoji manager + storage */
+.srv-section { margin-top: 16px; }
+.emoji-manager { display: flex; flex-direction: column; gap: 4px; max-height: 220px; overflow-y: auto; }
+.emoji-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 5px 8px; background: var(--panel-2); border-radius: 6px; font-size: 12px;
+}
+.emoji-row .srv-act { margin-left: auto; }
+.net-row.slim { margin: 4px 0 8px; }
+#emoji-name { width: 240px; padding: 6px 9px; font-size: 12px; background: var(--panel-2); border: 1px solid var(--seam); border-radius: 6px; color: var(--parchment); }
+label.rail-add { display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }

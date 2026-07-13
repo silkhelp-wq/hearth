@@ -10,12 +10,15 @@ export const escapeHtml = (s) =>
 
 const URL_RE = /https?:\/\/[^\s<>"'`]+/g;
 
+const EMOJI_TOKEN_RE = /:([a-z0-9_]{2,32}):/g;
+
 /**
  * @param {string} text raw message content
  * @param {string[]} names known display names (for @mention highlighting)
  * @param {string} myName current user's name (mentions of it get .mention-me)
+ * @param {object} emojiCtx { map: Map(name -> {id, ext}), base: serverBaseUrl }
  */
-export function renderMarkdown(text, names = [], myName = '') {
+export function renderMarkdown(text, names = [], myName = '', emojiCtx = null) {
   const stash = [];
   const keep = (html) => `\u0000${stash.push(html) - 1}\u0000`;
 
@@ -35,6 +38,19 @@ export function renderMarkdown(text, names = [], myName = '') {
     return keep(
       `<a href="${trimmed}" target="_blank" rel="noreferrer noopener">${trimmed}</a>`) + tail;
   });
+
+  // Custom server emojis — :name: tokens become inline images.
+  if (emojiCtx?.map?.size) {
+    const jumbo = isEmojiOnly(text, emojiCtx.map);
+    s = s.replace(EMOJI_TOKEN_RE, (whole, name) => {
+      const e = emojiCtx.map.get(name);
+      if (!e) return whole;
+      return keep(
+        `<img class="cemoji${jumbo ? ' jumbo' : ''}" ` +
+        `src="${emojiCtx.base}/emoji/${e.id}.${e.ext}" ` +
+        `alt=":${name}:" title=":${name}:" draggable="false">`);
+    });
+  }
 
   // Emphasis.
   s = s.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
@@ -77,3 +93,11 @@ export const timeShort = (ts) => {
   const hm = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   return today ? hm : `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${hm}`;
 };
+
+/** True when the message is nothing but emoji tokens / emoji characters. */
+export function isEmojiOnly(text, emojiMap) {
+  let rest = String(text)
+    .replace(EMOJI_TOKEN_RE, (whole, name) => (emojiMap?.has(name) ? '' : whole));
+  rest = rest.replace(/\p{Extended_Pictographic}|\p{Emoji_Component}|\u200d|\ufe0f/gu, '');
+  return rest.trim() === '' && text.trim() !== '';
+}
