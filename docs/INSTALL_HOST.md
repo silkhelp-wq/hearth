@@ -6,8 +6,8 @@ The real resource is **upload bandwidth** — see `STREAM_SETTINGS.md`.
 
 ## Prerequisites
 
-- Node.js **20 or newer** (`node -v` to check)
-  - Linux: your package manager (`sudo pacman -S nodejs npm`,
+- Node.js **22 or newer** (`node -v` to check)
+  - Linux: your package manager (`sudo pacman -S nodejs-lts-jod npm`,
     `sudo apt install nodejs npm`) or <https://nodejs.org>
   - Windows / macOS: installer from <https://nodejs.org>
 - Tailscale installed and signed in (`docs/CONNECTION_GUIDE.md`)

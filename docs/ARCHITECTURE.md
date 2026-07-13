@@ -92,7 +92,7 @@ first keyframes.
 
 ## Engineering standards
 
-- **Language level:** Node 20+ / ES2022; renderer bundled by esbuild
+- **Language level:** Node 22+ / ES2022; renderer bundled by esbuild
   targeting Chromium ≥130 (Electron 43).
 - **Style:** 2-space indent, single quotes, semicolons; `const` by default.
   Modules stay under ~450 lines; one responsibility per file.

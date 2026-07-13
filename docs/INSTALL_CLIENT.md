@@ -5,7 +5,7 @@ packaged installers built with electron-builder.
 
 ## Option A — run from source (all OSes)
 
-Prereq: Node.js 20+.
+Prereq: Node.js 22+.
 
 ```bash
 cd client

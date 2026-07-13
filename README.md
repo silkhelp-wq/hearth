@@ -18,7 +18,7 @@ rides on your [Tailscale](https://tailscale.com) tailnet.
 
 ## Quick start (host, ~5 minutes)
 
-Prereqs: [Node.js 20+](https://nodejs.org) and [Tailscale](https://tailscale.com/download)
+Prereqs: [Node.js 22+](https://nodejs.org) and [Tailscale](https://tailscale.com/download)
 running on the host machine.
 
 ```bash
