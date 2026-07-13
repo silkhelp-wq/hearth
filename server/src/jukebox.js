@@ -180,7 +180,14 @@ class JukeboxSession {
       rtpParameters: {
         codecs: [{
           mimeType: 'audio/opus', payloadType: PAYLOAD_TYPE,
-          clockRate: 48000, channels: 2, parameters: { 'sprop-stereo': 1 }
+          clockRate: 48000, channels: 2,
+          // MUST byte-match what browser mic producers declare: mediasoup
+          // copies producer codec params into every consumer, and libwebrtc
+          // rejects a BUNDLE where the same payload type carries different
+          // opus fmtp — the second audio consumer then fails to attach.
+          parameters: {
+            minptime: 10, 'sprop-stereo': 1, usedtx: 0, useinbandfec: 1
+          }
         }],
         encodings: [{ ssrc: SSRC }]
       },

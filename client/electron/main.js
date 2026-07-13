@@ -23,6 +23,11 @@ const path = require('path');
 // software-encode AV1 shares.
 app.commandLine.appendSwitch('enable-features',
   'WebRTCPipeWireCapturer,AcceleratedVideoEncoder,WebRtcAV1HWEncode');
+// Chromium's Vulkan path conflicts with ozone-wayland ('not compatible with
+// Vulkan' spam) and buys nothing on the NVIDIA GL stack — force it off.
+if (process.platform === 'linux') {
+  app.commandLine.appendSwitch('disable-features', 'Vulkan');
+}
 
 let win = null;
 
@@ -131,10 +136,14 @@ app.whenReady().then(() => {
           types: ['screen', 'window'],
           thumbnailSize: { width: 0, height: 0 }
         });
-        // Strict match only. Falling back to sources[0] here is how a
-        // machine with broken capture (WGC E_ACCESSDENIED) ends up
-        // silently sharing Hearth's own window instead of erroring.
-        const source = choice && sources.find((s) => s.id === choice.id);
+        // Strict id match on Windows/macOS: falling back to sources[0]
+        // there is how a machine with broken capture ends up silently
+        // sharing Hearth's own window. Linux is the exception — under
+        // PipeWire this call opens a NEW portal session that returns the
+        // single source the user just approved, with a fresh id that can
+        // never equal the picker's, so that one source IS the answer.
+        const source = (choice && sources.find((s) => s.id === choice.id)) ||
+          (process.platform === 'linux' ? sources[0] : null);
         if (!source) {
           console.error('[share] picked source not capturable:',
             choice?.id, '— enumerated', sources.length, 'sources');
