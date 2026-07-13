@@ -106,6 +106,9 @@ const state = {
   editingChannel: null,
   editingRole: null,
   accessDraft: null,      // roleId -> {perm -> 'inherit'|'allow'|'deny'}
+  caps: {},               // server capabilities from hello
+  jb: null,               // jukebox state for the connected voice channel
+  localMuted: new Map(),  // peerId -> previous volume (mute-for-me)
   pendingAfterHello: null // {voice, view} rejoin targets after reconnect
 };
 
@@ -239,6 +242,7 @@ function applyHello(h) {
   state.users = new Map((h.users || []).map((u) => [u.id, u]));
   state.readState = h.readState || {};
   state.ownerClaimed = !!h.ownerClaimed;
+  state.caps = h.caps || {};
   $('server-name').textContent = h.serverName || 'Hearth';
   $('self-name').textContent = state.me.name;
 
@@ -398,20 +402,7 @@ function railPeerRow(p, channelId) {
   flags.className = 'flags';
   row.appendChild(flags);
 
-  // Per-person volume, only meaningful for people in *my* channel.
-  if (channelId === state.channelId && p.id !== rtc.socket?.id) {
-    const vol = document.createElement('input');
-    vol.type = 'range'; vol.min = 0; vol.max = 100;
-    vol.value = Math.round((state.volumes.get(p.id) ?? 1) * 100);
-    vol.title = 'Volume';
-    vol.addEventListener('click', (e) => e.stopPropagation());
-    vol.addEventListener('input', () => {
-      const v = vol.value / 100;
-      state.volumes.set(p.id, v);
-      for (const el of audioEls(p.id)) el.volume = v;
-    });
-    row.appendChild(vol);
-  }
+  // Volume lives in the right-click menu now (works for the jukebox too).
   refreshPeerFlags(row, p.id, p.state);
   return row;
 }
@@ -458,9 +449,10 @@ async function joinChannel(channelId) {
 
   if (state.channelId) await leaveChannel({ keepMic: true });
 
-  const { peers, canSpeak } = await rtc.join(channelId);
+  const { peers, canSpeak, jukebox: jbState } = await rtc.join(channelId);
   state.channelId = channelId;
   state.canSpeak = canSpeak;
+  state.jb = jbState || null;
   state.channelName = state.dirMap.get(channelId)?.name || 'hall';
 
   state.peers.clear();
@@ -469,6 +461,7 @@ async function joinChannel(channelId) {
   $('stage-title').textContent = state.channelName;
   $('controls').classList.remove('hidden');
   updateVoiceStrip();
+  updateJukeboxBar();
 
   // Discord behavior: connecting to voice while reading a text channel
   // keeps the text view — the rail strip shows the connection. The stage
@@ -504,7 +497,9 @@ async function leaveChannel({ keepMic = false } = {}) {
   $('controls').classList.add('hidden');
 
   if (!keepMic) stopMicStream();
+  state.jb = null;
   updateVoiceStrip();
+  updateJukeboxBar();
   if (state.viewId === null || !state.dirMap.get(state.viewId) ||
       state.dirMap.get(state.viewId)?.type === 'voice') {
     state.viewId = null;
@@ -941,6 +936,12 @@ function wireRaw() {
   rtc.onRaw('room:closed', () => {
     leaveChannel().catch(console.error);
     updateEmptyStage('That hall was deleted.');
+  });
+
+  rtc.onRaw('jukebox:update', (st) => {
+    if (st?.channelId !== state.channelId) return;
+    state.jb = st;
+    updateJukeboxBar();
   });
 }
 
@@ -1543,6 +1544,224 @@ const escapeHtml = (s) =>
   String(s).replace(/[&<>"']/g, (c) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+/* ────────────────────────────── jukebox ─────────────────────────────── */
+
+const fmtDur = (s) => {
+  s = Math.max(0, Math.round(s || 0));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
+
+function myVoicePerms() {
+  return state.channelId ? (state.dirMap.get(state.channelId)?.myPerms ?? 0) : 0;
+}
+
+function updateJukeboxBar() {
+  const bar = $('jukebox-bar');
+  const show = Boolean(state.channelId && state.caps.jukebox);
+  bar.classList.toggle('hidden', !show);
+  if (!show) { $('jb-queue-pop').classList.add('hidden'); return; }
+
+  const jb = state.jb;
+  const np = jb?.nowPlaying;
+  $('jb-title').textContent = np
+    ? np.title
+    : 'nothing playing — paste a link to start the jukebox';
+  $('jb-sub').textContent = np
+    ? `${jb.paused ? '⏸ paused · ' : ''}${fmtDur(np.duration)} · queued by ${np.by}` +
+      (np.via && np.via !== 'youtube' ? ` · via ${np.via}` : '')
+    : '';
+  const canControl = has(myVoicePerms(), P.SPEAK);
+  $('jb-skip').classList.toggle('hidden', !(np && canControl));
+  $('jb-pause').classList.toggle('hidden',
+    !(np && canControl && state.caps.jukeboxPause));
+  const n = jb?.queue?.length || 0;
+  $('jb-count').textContent = n ? String(n) : '';
+  $('jb-input').disabled = !canControl;
+  $('jb-add').disabled = !canControl;
+  if (!$('jb-queue-pop').classList.contains('hidden')) renderQueuePop();
+}
+
+function renderQueuePop() {
+  const pop = $('jb-queue-pop');
+  pop.textContent = '';
+  const items = state.jb?.queue || [];
+  if (!items.length) {
+    const d = document.createElement('div');
+    d.className = 'jb-q-empty';
+    d.textContent = 'Queue is empty.';
+    pop.appendChild(d);
+    return;
+  }
+  items.forEach((t, i) => {
+    const row = document.createElement('div');
+    row.className = 'jb-q-row';
+    row.innerHTML =
+      `<span class="jb-q-n mono">${i + 1}</span>` +
+      `<span class="jb-q-title">${escapeHtml(t.title)}</span>` +
+      `<span class="jb-q-meta mono">${fmtDur(t.duration)} · ${escapeHtml(t.by)}</span>`;
+    pop.appendChild(row);
+  });
+}
+
+async function queueTrack() {
+  const input = $('jb-input');
+  const url = input.value.trim();
+  if (!url) return;
+  const btn = $('jb-add');
+  btn.disabled = true; btn.textContent = 'finding…';
+  try {
+    await rtc.request('jukebox:queue', { url });
+    input.value = '';
+  } catch (err) {
+    $('jb-sub').textContent = err.message;
+    setTimeout(updateJukeboxBar, 3500);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Play';
+  }
+}
+
+/* ─────────────────────── peer context menu ──────────────────────────── */
+
+function findPeerInDir(peerId) {
+  for (const ch of state.directory) {
+    const p = (ch.peers || []).find((x) => x.id === peerId);
+    if (p) return { ...p, channelId: ch.id };
+  }
+  return null;
+}
+
+function closeCtxMenu() {
+  $('ctx-menu').classList.add('hidden');
+}
+
+function openPeerMenu(x, y, peerId) {
+  const menu = $('ctx-menu');
+  menu.textContent = '';
+
+  const inDir = findPeerInDir(peerId);
+  const live = state.peers.get(peerId);
+  const name = live?.name || inDir?.name || 'someone';
+  const userId = live?.userId || inDir?.userId || null;
+  const isJukebox = peerId.startsWith('jukebox:');
+  const isSelf = peerId === rtc.socket?.id;
+  const els = audioEls(peerId);
+
+  const head = document.createElement('div');
+  head.className = 'ctx-head';
+  head.textContent = name;
+  menu.appendChild(head);
+
+  // Volume + mute-for-me: anyone I can currently hear (jukebox included).
+  if (!isSelf && els.length) {
+    const volRow = document.createElement('div');
+    volRow.className = 'ctx-slider';
+    const label = document.createElement('span');
+    const pct = Math.round((state.volumes.get(peerId) ?? 1) * 100);
+    label.textContent = `Volume ${pct}%`;
+    const vol = document.createElement('input');
+    vol.type = 'range'; vol.min = 0; vol.max = 100; vol.value = pct;
+    vol.addEventListener('input', () => {
+      const v = vol.value / 100;
+      state.volumes.set(peerId, v);
+      state.localMuted.delete(peerId);
+      for (const el of audioEls(peerId)) el.volume = v;
+      label.textContent = `Volume ${vol.value}%`;
+      syncMuteRow();
+    });
+    volRow.append(label, vol);
+    menu.appendChild(volRow);
+
+    const muteRow = document.createElement('button');
+    muteRow.className = 'ctx-item';
+    const syncMuteRow = () => {
+      const muted = (state.volumes.get(peerId) ?? 1) === 0;
+      muteRow.textContent = muted ? '🔊 Unmute for me' : '🔇 Mute for me';
+    };
+    syncMuteRow();
+    muteRow.addEventListener('click', () => {
+      const cur = state.volumes.get(peerId) ?? 1;
+      let next;
+      if (cur === 0) {
+        next = state.localMuted.get(peerId) ?? 1;
+        state.localMuted.delete(peerId);
+      } else {
+        state.localMuted.set(peerId, cur);
+        next = 0;
+      }
+      state.volumes.set(peerId, next);
+      for (const el of audioEls(peerId)) el.volume = next;
+      vol.value = Math.round(next * 100);
+      label.textContent = `Volume ${vol.value}%`;
+      syncMuteRow();
+    });
+    menu.appendChild(muteRow);
+  }
+
+  if (isJukebox && has(myVoicePerms(), P.SPEAK)) {
+    const skip = document.createElement('button');
+    skip.className = 'ctx-item';
+    skip.textContent = '⏭ Skip this track';
+    skip.addEventListener('click', () => {
+      closeCtxMenu();
+      rtc.request('jukebox:skip', {}).catch((err) => alert(err.message));
+    });
+    menu.appendChild(skip);
+  }
+
+  // Moderation: real people only, never yourself, never the owner.
+  const target = userId ? state.users.get(userId) : null;
+  if (target && userId !== state.me?.id && !target.isOwner) {
+    const chPerms = inDir ? (state.dirMap.get(inDir.channelId)?.myPerms ?? 0)
+                          : myBasePerms();
+    let divided = false;
+    const divide = () => {
+      if (divided || !menu.childElementCount) return;
+      const hr = document.createElement('div');
+      hr.className = 'ctx-div';
+      menu.appendChild(hr);
+      divided = true;
+    };
+    if (has(chPerms, P.MUTE_MEMBERS)) {
+      divide();
+      const muted = !!(live?.state?.serverMuted || inDir?.state?.serverMuted);
+      const b = document.createElement('button');
+      b.className = 'ctx-item';
+      b.textContent = muted ? '🔔 Server unmute' : '🔕 Server mute';
+      b.addEventListener('click', () => {
+        closeCtxMenu();
+        rtc.request('member:mute', { userId, muted: !muted })
+          .catch((err) => alert(err.message));
+      });
+      menu.appendChild(b);
+    }
+    if (has(myBasePerms(), P.KICK_MEMBERS)) {
+      divide();
+      const b = document.createElement('button');
+      b.className = 'ctx-item danger';
+      b.textContent = '⏻ Kick from server';
+      b.addEventListener('click', () => {
+        closeCtxMenu();
+        if (confirm(`Kick ${name}? They can rejoin unless you change permissions.`)) {
+          rtc.request('member:kick', { userId }).catch((err) => alert(err.message));
+        }
+      });
+      menu.appendChild(b);
+    }
+  }
+
+  if (!menu.childElementCount || menu.childElementCount === 1) {
+    const none = document.createElement('div');
+    none.className = 'ctx-none';
+    none.textContent = isSelf ? 'That\u2019s you.' : 'No actions available.';
+    menu.appendChild(none);
+  }
+
+  menu.classList.remove('hidden');
+  const w = menu.offsetWidth, h = menu.offsetHeight;
+  menu.style.left = Math.min(x, window.innerWidth - w - 8) + 'px';
+  menu.style.top = Math.min(y, window.innerHeight - h - 8) + 'px';
+}
+
 /* ───────────────────────── reconnect handling ───────────────────────── */
 
 let banner = null;
@@ -1587,6 +1806,46 @@ function wire() {
   $('btn-rail-settings').addEventListener('click', openSettings);
   $('vs-info').addEventListener('click', () => { if (state.channelId) showStage(); });
   $('btn-vs-leave').addEventListener('click', () => leaveChannel().catch(console.error));
+
+  // jukebox
+  $('jb-add').addEventListener('click', () => queueTrack());
+  $('jb-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') queueTrack(); });
+  $('jb-skip').addEventListener('click', () =>
+    rtc.request('jukebox:skip', {}).catch((err) => alert(err.message)));
+  $('jb-pause').addEventListener('click', () =>
+    rtc.request('jukebox:pause', { paused: !state.jb?.paused })
+      .catch((err) => alert(err.message)));
+  $('jb-queue-btn').addEventListener('click', () => {
+    const pop = $('jb-queue-pop');
+    pop.classList.toggle('hidden');
+    if (!pop.classList.contains('hidden')) renderQueuePop();
+  });
+
+  // right-click menus on people (rail rows + video tiles)
+  const ctxTarget = (e) => {
+    const row = e.target.closest('.rail-peer');
+    if (row?.dataset.peer) return row.dataset.peer;
+    const tile = e.target.closest('.tile');
+    if (tile?.dataset.peer && tile.dataset.peer !== 'self') return tile.dataset.peer;
+    return null;
+  };
+  document.addEventListener('contextmenu', (e) => {
+    const peerId = ctxTarget(e);
+    if (!peerId) { closeCtxMenu(); return; }
+    e.preventDefault();
+    openPeerMenu(e.clientX, e.clientY, peerId);
+  });
+  window.addEventListener('mousedown', (e) => {
+    if (!$('ctx-menu').contains(e.target)) closeCtxMenu();
+    const pop = $('jb-queue-pop');
+    if (!pop.classList.contains('hidden') &&
+        !pop.contains(e.target) && !$('jb-queue-btn').contains(e.target)) {
+      pop.classList.add('hidden');
+    }
+  });
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { closeCtxMenu(); $('jb-queue-pop').classList.add('hidden'); }
+  });
 
   // channel management
   $('btn-add-text').addEventListener('click', () => openCreateChannel('text'));

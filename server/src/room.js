@@ -13,6 +13,7 @@
 
 const soup = require('./soup');
 const db = require('./db');
+const jukebox = require('./jukebox');
 const { P, has } = require('./perms');
 
 const rooms = new Map();        // channelId -> Room (voice, live only)
@@ -52,6 +53,7 @@ class Room {
     this.id = channelId;
     this.router = router;
     this.peers = new Map();
+    this.jukebox = null;
     this.audioLevelObserver = null;
     this.lastSpeaker = null;
   }
@@ -75,8 +77,10 @@ class Room {
     });
   }
   peerSummaries(excludeId) {
-    return [...this.peers.values()]
+    const out = [...this.peers.values()]
       .filter((p) => p.id !== excludeId).map((p) => p.summary());
+    if (this.jukebox?.producer) out.push(this.jukebox.summary());
+    return out;
   }
 }
 
@@ -98,16 +102,24 @@ async function getOrCreateRoom(channelId) {
 
 function publicDirectory() {
   const last = db.lastMessageIds();
-  return db.listChannels().map((c) => ({
-    id: c.id, name: c.name, type: c.type, topic: c.topic, position: c.position,
-    peers: c.type === 'voice'
-      ? [...(rooms.get(c.id)?.peers.values() || [])].map((p) => ({
+  return db.listChannels().map((c) => {
+    const room = rooms.get(c.id);
+    const peers = c.type === 'voice'
+      ? [...(room?.peers.values() || [])].map((p) => ({
           id: p.id, userId: p.user.id, name: p.user.name,
           state: { ...p.state, serverMuted: serverMuted.has(p.user.id) }
         }))
-      : [],
-    lastMessageId: last[c.id] || 0
-  }));
+      : [];
+    if (c.type === 'voice' && room?.jukebox?.producer) {
+      const jb = room.jukebox.summary();
+      peers.push({ id: jb.id, userId: jb.userId, name: jb.name, state: jb.state });
+    }
+    return {
+      id: c.id, name: c.name, type: c.type, topic: c.topic, position: c.position,
+      peers,
+      lastMessageId: last[c.id] || 0
+    };
+  });
 }
 
 function directoryFor(userId) {
@@ -152,6 +164,10 @@ function leaveVoice(io, socket) {
       room.lastSpeaker = null;
       io.to(room.id).emit('speaker', { peerId: null });
     }
+  }
+  if (room.peers.size === 0 && room.jukebox) {
+    room.jukebox.destroy();
+    room.jukebox = null;
   }
   socket.leave(channelId);
   dirDirty(io);
@@ -215,8 +231,59 @@ function attachSocket(io, socket) {
     return {
       routerRtpCapabilities: room.router.rtpCapabilities,
       peers: room.peerSummaries(peer.id),
-      canSpeak: has(p, P.SPEAK) && !serverMuted.has(user.id)
+      canSpeak: has(p, P.SPEAK) && !serverMuted.has(user.id),
+      jukebox: room.jukebox?.publicState() || null
     };
+  }));
+
+  /* ---- jukebox ---- */
+
+  const jukeboxRoom = () => {
+    if (!jukebox.available()) {
+      throw new Error('jukebox needs yt-dlp and ffmpeg installed on the host');
+    }
+    const room = currentRoom();
+    if (!room) throw new Error('join a voice channel first');
+    need(perms(room.id), P.SPEAK, 'you need speak permission to control music');
+    return room;
+  };
+
+  socket.on('jukebox:queue', guarded(async ({ url }) => {
+    const room = jukeboxRoom();
+    url = String(url || '').trim().slice(0, 500);
+    if (!url) throw new Error('paste a link first');
+
+    const meta = await jukebox.resolveTrack(url);
+    if (meta.duration > jukebox.MAX_TRACK_SECONDS) {
+      throw new Error('that track is too long');
+    }
+    if (!room.jukebox || room.jukebox.closed) {
+      room.jukebox = new jukebox.JukeboxSession(room.id, room.router, io);
+    }
+    await room.ensureAudioObserver(io);
+    await room.jukebox.ensureProducer(room.audioLevelObserver);
+    await room.jukebox.add({ ...meta, by: user.name });
+    dirDirty(io);
+    return { queued: { title: meta.title, duration: meta.duration, via: meta.via } };
+  }));
+
+  socket.on('jukebox:skip', guarded(async () => {
+    const room = jukeboxRoom();
+    if (!room.jukebox?.nowPlaying) throw new Error('nothing is playing');
+    room.jukebox.skip();
+    return { ok: true };
+  }));
+
+  socket.on('jukebox:pause', guarded(async ({ paused }) => {
+    const room = jukeboxRoom();
+    if (!room.jukebox) throw new Error('nothing is playing');
+    room.jukebox.setPaused(!!paused);
+    return { ok: true };
+  }));
+
+  socket.on('jukebox:state', guarded(async () => {
+    const room = currentRoom();
+    return { state: room?.jukebox?.publicState() || null };
   }));
 
   socket.on('room:leave', guarded(async () => { leaveVoice(io, socket); return { ok: true }; }));
@@ -354,6 +421,8 @@ function attachSocket(io, socket) {
     if (ch.type === 'voice') {
       const room = rooms.get(channelId);
       if (room) {
+        room.jukebox?.destroy();
+        room.jukebox = null;
         io.to(channelId).emit('room:closed', { channelId });
         for (const peer of [...room.peers.values()]) leaveVoice(io, peer.socket);
         rooms.delete(channelId);

@@ -86,7 +86,7 @@ export class HearthRTC extends Emitter {
   // ------------------------------------------------------------------ join
 
   async join(channelId) {
-    const { routerRtpCapabilities, peers, canSpeak } =
+    const { routerRtpCapabilities, peers, canSpeak, jukebox } =
       await this.request('room:join', { channelId });
 
     this.device = new Device();
@@ -107,7 +107,7 @@ export class HearthRTC extends Emitter {
         }).catch((e) => console.error('[rtc] consume:', e));
       }
     }
-    return { peers, canSpeak };
+    return { peers, canSpeak, jukebox };
   }
 
   async leave() {

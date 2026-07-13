@@ -85,6 +85,20 @@
         </div>
       </header>
 
+      <div id="jukebox-bar" class="jukebox-bar hidden">
+        <span class="jb-icon" aria-hidden="true">🎵</span>
+        <div class="jb-now">
+          <span id="jb-title" class="jb-title">nothing playing</span>
+          <span id="jb-sub" class="jb-sub"></span>
+        </div>
+        <button id="jb-pause" class="icon-btn hidden" title="Pause / resume">⏯</button>
+        <button id="jb-skip" class="icon-btn hidden" title="Skip">⏭</button>
+        <button id="jb-queue-btn" class="icon-btn" title="Queue">≡<span id="jb-count" class="jb-count"></span></button>
+        <input id="jb-input" type="text" placeholder="paste a YouTube / Spotify / Pandora link" spellcheck="false" />
+        <button id="jb-add" class="btn small primary">Play</button>
+      </div>
+      <div id="jb-queue-pop" class="jb-queue-pop hidden"></div>
+
       <div id="tile-grid" class="tile-grid"></div>
 
       <div id="empty-stage" class="empty-stage">
@@ -132,6 +146,7 @@
   </section>
 
   <div id="emoji-pop" class="emoji-pop hidden"></div>
+  <div id="ctx-menu" class="ctx-menu hidden"></div>
 
   <!-- ═══════════════ Create channel ═══════════════ -->
   <dialog id="modal-channel" class="modal">

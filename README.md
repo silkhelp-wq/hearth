@@ -24,6 +24,13 @@ rides on your [Tailscale](https://tailscale.com) tailnet.
 - **Storage that never grows past 1 GB**: chat lives in SQLite; when the cap
   is hit the oldest messages are pruned automatically (a text-only crew of 8
   takes roughly a decade to get there)
+- **Jukebox** (v0.3): paste a YouTube link and the host streams the audio
+  into the voice channel as a real participant everyone hears in sync —
+  queue, skip, pause, and a per-listener volume slider. Spotify and Pandora
+  links resolve by title and play the YouTube match (their audio is DRM'd).
+  Needs `yt-dlp` + `ffmpeg` on the host; auto-hides otherwise.
+- **Right-click anyone** for a volume slider, mute-for-me, and (permission-
+  gated) server mute / kick
 - **Cross-platform**: Linux, Windows, macOS (Electron)
 
 ## Quick start (host, ~5 minutes)

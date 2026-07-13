@@ -20,6 +20,7 @@ const soup = require('./soup');
 const room = require('./room');
 const chat = require('./chat');
 const unfurl = require('./unfurl');
+const jukebox = require('./jukebox');
 const { P, ALL, has } = require('./perms');
 
 const SELFTEST = process.argv.includes('--selftest');
@@ -182,7 +183,11 @@ async function main() {
       readState: db.readState(user.id),
       ownerClaimed: db.ownerClaimed(),
       serverName: config.serverName,
-      caps: { maxMessageLen: config.chat.maxMessageLen }
+      caps: {
+        maxMessageLen: config.chat.maxMessageLen,
+        jukebox: jukebox.available(),
+        jukeboxPause: jukebox.available() && jukebox.canPause()
+      }
     });
 
     socket.on('user:rename', guarded(async ({ name }) => {
@@ -393,8 +398,47 @@ async function selftest() {
     const router = await soup.getOrCreateRouter(voice.id);
     assert(router.rtpCapabilities.codecs.length > 0, 'router codecs');
     const codecs = config.mediasoup.router.mediaCodecs.map((c) => c.mimeType.split('/')[1]).join(', ');
-    soup.closeRouter(voice.id);
     ok(`mediasoup worker + WebRtcServer + lazy router (${codecs})`);
+
+    step = 'jukebox';
+    const cls = jukebox.classifySource;
+    assert(cls('https://www.youtube.com/watch?v=x').kind === 'youtube', 'youtube classified');
+    assert(cls('https://youtu.be/x').kind === 'youtube', 'youtu.be classified');
+    assert(cls('https://open.spotify.com/track/x').kind === 'spotify', 'spotify classified');
+    assert(cls('https://www.pandora.com/artist/a/s/song').kind === 'pandora', 'pandora classified');
+    assert(cls('not a url').kind === 'invalid', 'garbage rejected');
+    assert(jukebox.titleToQuery('Losing It - song and lyrics by FISHER | Spotify')
+      === 'Losing It FISHER', 'spotify title cleaned');
+    ok('jukebox link classification');
+
+    const { spawnSync, spawn } = require('child_process');
+    const hasFfmpeg = (() => {
+      try { return spawnSync('ffmpeg', ['-version'], { timeout: 4000 }).status === 0; }
+      catch { return false; }
+    })();
+    if (hasFfmpeg) {
+      step = 'jukebox pipeline';
+      const session = new jukebox.JukeboxSession(voice.id, router,
+        { to: () => ({ emit: () => {} }), emit: () => {} });
+      await session.ensureProducer(null);
+      const rtp = session.transport.tuple.localPort;
+      const rtcp = session.transport.rtcpTuple.localPort;
+      const ff = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error',
+        '-re', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=2',
+        '-map', '0:a:0',
+        '-acodec', 'libopus', '-ab', '128k', '-ac', '2', '-ar', '48000',
+        '-f', 'tee',
+        `[select=a:f=rtp:ssrc=22222222:payload_type=101]rtp://127.0.0.1:${rtp}?rtcpport=${rtcp}`]);
+      await new Promise((r) => ff.on('close', r));
+      const stats = await session.producer.getStats();
+      const got = stats.find((s) => s.type === 'inbound-rtp')?.packetCount || 0;
+      session.destroy();
+      assert(got > 20, `RTP flowed into the producer (${got} packets)`);
+      ok(`jukebox pipeline — ffmpeg → PlainTransport (${got} pkts)`);
+    } else {
+      console.log('[selftest] jukebox pipeline: SKIPPED (no ffmpeg here)');
+    }
+    soup.closeRouter(voice.id);
 
     console.log(`[selftest] announce: ${config.announcedAddress} (media port ${config.mediaPort})`);
     console.log('[selftest] ALL PASS');

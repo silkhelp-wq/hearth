@@ -11,6 +11,10 @@ The real resource is **upload bandwidth** — see `STREAM_SETTINGS.md`.
     `sudo apt install nodejs npm`) or <https://nodejs.org>
   - Windows / macOS: installer from <https://nodejs.org>
 - Tailscale installed and signed in (`docs/CONNECTION_GUIDE.md`)
+- **Optional — jukebox**: `yt-dlp` and `ffmpeg` on the host enable in-channel
+  music (`sudo pacman -S yt-dlp ffmpeg` / `sudo apt install yt-dlp ffmpeg`).
+  Missing binaries just hide the feature. Keep `yt-dlp` fresh — YouTube
+  breaks old versions (`yt-dlp -U` or your package manager).
 - mediasoup ships prebuilt media workers for Linux x64/arm64, Windows x64,
   and macOS — no compiler needed on common platforms. If npm ever falls back
   to building from source it will say so; installing `python3` + a C++

@@ -773,3 +773,72 @@ input[type="range"] { accent-color: var(--steel); width: 180px; }
 }
 .vs-info:hover .vs-channel { color: var(--ember); }
 .vs-leave { color: var(--danger); font-size: 15px; flex: none; }
+
+/* ═══════════════ jukebox bar & queue ═══════════════ */
+
+.jukebox-bar {
+  display: flex; align-items: center; gap: 10px;
+  margin: 8px 16px 0;
+  padding: 8px 12px;
+  background: var(--panel);
+  border: 1px solid var(--seam);
+  border-radius: 10px;
+}
+.jb-icon { font-size: 16px; }
+.jb-now { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.jb-title {
+  font-size: 13px; font-weight: 600; color: var(--parchment);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.jb-sub { font-size: 11px; color: var(--ash); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jukebox-bar input {
+  width: min(300px, 32vw); padding: 6px 10px; font-size: 12px;
+  background: var(--panel-2); border: 1px solid var(--seam);
+  border-radius: 6px; color: var(--parchment);
+}
+.jukebox-bar input:focus { outline: none; border-color: var(--steel); }
+.jb-count { font-size: 10px; color: var(--ember); font-weight: 700; margin-left: 2px; }
+
+.jb-queue-pop {
+  position: absolute; top: 104px; right: 20px; z-index: 45;
+  width: min(380px, 85%); max-height: 46%; overflow-y: auto;
+  background: var(--panel); border: 1px solid var(--seam);
+  border-radius: 10px; box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55);
+  padding: 6px;
+}
+.jb-q-empty { padding: 12px; font-size: 12px; color: var(--ash); }
+.jb-q-row {
+  display: grid; grid-template-columns: 22px minmax(0, 1fr) auto;
+  gap: 8px; align-items: center; padding: 6px 8px; border-radius: 6px;
+}
+.jb-q-row:hover { background: var(--panel-2); }
+.jb-q-n { font-size: 11px; color: var(--ash); }
+.jb-q-title { font-size: 12.5px; color: var(--parchment); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jb-q-meta { font-size: 10.5px; color: var(--ash); }
+
+/* ═══════════════ peer context menu ═══════════════ */
+
+.ctx-menu {
+  position: fixed; z-index: 70; min-width: 230px; max-width: 300px;
+  background: var(--panel); border: 1px solid var(--seam);
+  border-radius: 10px; padding: 6px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
+}
+.ctx-head {
+  padding: 6px 10px 8px; font-size: 13px; font-weight: 700;
+  color: var(--parchment); border-bottom: 1px solid var(--seam);
+  margin-bottom: 4px;
+}
+.ctx-item {
+  display: block; width: 100%; text-align: left;
+  padding: 7px 10px; font-size: 12.5px; color: var(--parchment);
+  background: none; border: none; border-radius: 6px; cursor: pointer;
+}
+.ctx-item:hover { background: var(--panel-2); }
+.ctx-item.danger { color: var(--danger); }
+.ctx-item.danger:hover { background: rgba(196, 92, 74, 0.14); }
+.ctx-div { height: 1px; background: var(--seam); margin: 5px 4px; }
+.ctx-none { padding: 8px 10px; font-size: 12px; color: var(--ash); }
+.ctx-slider { display: flex; flex-direction: column; gap: 4px; padding: 6px 10px 8px; }
+.ctx-slider span { font-size: 11px; color: var(--ash); }
+.ctx-slider input { width: 100%; }

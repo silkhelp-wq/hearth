@@ -197,3 +197,15 @@ Routers are now created lazily per voice channel (channels are dynamic).
 `SPEAK` and not being moderator-muted. Moderator mute closes the live mic
 producer server-side and survives until toggled off (state is in-memory —
 a server restart clears it).
+
+### Jukebox (v0.3)
+
+One optional session per voice channel. The host resolves a link
+(`yt-dlp -j`; Spotify/Pandora titles resolve via oEmbed/page metadata to a
+`ytsearch1:` query), then pipes `yt-dlp -o - | ffmpeg -re … libopus 48k
+stereo` as RTP into a mediasoup **PlainTransport** (`comedia`), producing a
+normal audio producer. Clients therefore treat the jukebox as just another
+peer — the rail row, speaking ring, per-listener volume, and deafen all work
+with zero special cases. Queue/skip/pause are gated on `SPEAK` in that
+channel; pause is SIGSTOP/SIGCONT (Linux/macOS hosts). The session tears
+down when the queue drains or the last human leaves.

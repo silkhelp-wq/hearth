@@ -162,3 +162,11 @@ including the 10-user × 60-minute soak (TC-11).
 - **NFR:** clients older than v0.2 (no token) SHALL be rejected with a clear
   upgrade message.
 - **NFR:** moderator-mute state MAY reset on server restart (in-memory).
+
+### 6.3 v0.3 additions — jukebox & member menu
+
+| ID | Requirement |
+|---|---|
+| FR-34 | Users with `SPEAK` in a voice channel SHALL be able to queue audio by URL; YouTube SHALL play directly, Spotify/Pandora links SHALL resolve by title to the best YouTube match; the host SHALL stream decoded opus into the channel via a PlainTransport producer heard synchronously by all members. |
+| FR-35 | The jukebox SHALL appear as a synthetic channel member with queue/skip (and pause on POSIX hosts) controls, a queue cap of 25, and SHALL self-disable when `yt-dlp`/`ffmpeg` are absent (capability advertised in hello). |
+| FR-36 | Right-clicking a member (rail or tile) SHALL open a menu with a per-listener volume slider and mute-for-me, plus server mute (`MUTE_MEMBERS`) and kick (`KICK_MEMBERS`) where permitted; the owner SHALL be exempt from moderation. |

@@ -109,3 +109,7 @@ extract for any failure. File issues with TC ID in the title.
 | TC-31 | Rolling prune | Set `HEARTH_CHAT_CAP_MB=1`, spam messages, wait for prune (or reboot) | Oldest messages removed until under cap; server log line; newest retained |
 | TC-32 | Old client rejected | Connect with a v0.1 build | Clear "requires Hearth v0.2+" error on the connect screen |
 | TC-33 | Markdown safety | Send `<img onerror=…>` and a fenced code block | Renders as escaped text / code; no HTML executes |
+
+| TC-34 | Jukebox E2E | Two clients in a hall; paste a YouTube link | Both hear the same audio in sync; 🎵 Jukebox row appears; skip advances; queue lists pending tracks |
+| TC-35 | Link resolution | Paste a Spotify track link | Title resolves, YouTube match plays, now-playing shows "via spotify→youtube"; garbage input errors cleanly |
+| TC-36 | Member menu | Right-click a peer and the jukebox | Volume slider changes only local playback; mute-for-me toggles; server mute/kick present only with perms; owner shows neither |
