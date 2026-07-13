@@ -52,6 +52,15 @@ single port (44444/udp+tcp), so there is nothing to configure on any router.
 | `docs/SRS.md` | Software Requirements Specification (IEEE 29148-style) |
 | `docs/TEST_PLAN.md` | Test plan & cases (IEEE 29119-style) |
 
+## Releases & CI
+
+Every push runs CI (`.github/workflows/ci.yml`): the server boots the real
+mediasoup stack (`npm run selftest`) and the client renderer must bundle
+clean. Pushing a tag like `v0.1.0` triggers the release workflow, which
+builds installers on GitHub's Linux/Windows/macOS runners and attaches
+`.AppImage`/`.deb`/`.exe`/`.dmg` files to the release — friends grab theirs
+from the **Releases** page, no build tools needed.
+
 ## Configuration
 
 Server environment variables (all optional):
