@@ -1,13 +1,16 @@
 {
   "name": "hearth",
   "productName": "Hearth",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Self-hosted voice, camera, screen-share, and chat hangout for your crew",
+  "homepage": "https://github.com/silkhelp-wq/hearth",
   "license": "MIT",
   "private": true,
   "author": "Mages of the Beaches LLC <silkhelp-wq@users.noreply.github.com>",
   "main": "electron/main.js",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "node esbuild.js",
     "start": "npm run build && electron .",
@@ -32,21 +35,37 @@
     "appId": "io.magesofthebeaches.hearth",
     "npmRebuild": false,
     "productName": "Hearth",
-    "directories": { "output": "release" },
-    "files": ["electron/**/*", "dist/**/*", "package.json"],
-    "asarUnpack": ["node_modules/uiohook-napi/**"],
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "dist/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/uiohook-napi/**"
+    ],
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "category": "AudioVideo;Network",
-      "maintainer": "Mages of the Beaches LLC"
+      "maintainer": "Mages of the Beaches LLC",
+      "syncDesktopName": true
     },
     "mac": {
-      "target": ["dmg"],
+      "target": [
+        "dmg"
+      ],
       "category": "public.app-category.social-networking",
       "identity": null
     },
     "win": {
-      "target": ["nsis"]
+      "target": [
+        "nsis"
+      ]
     },
     "nsis": {
       "oneClick": false,

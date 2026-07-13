@@ -243,7 +243,7 @@ input[type="range"] { accent-color: var(--steel); width: 180px; }
 
 /* ── stage ────────────────────────────────────────────────────────── */
 
-#stage { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+#stage { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 
 .stage-head {
   display: flex; align-items: center; justify-content: space-between;
@@ -714,3 +714,62 @@ input[type="range"] { accent-color: var(--steel); width: 180px; }
   margin: 10px 0; max-height: 240px; overflow-y: auto;
 }
 .role-perms .check { font-size: 12px; }
+
+/* ═══════════ responsive modals — Windows DPI overflow fix ═══════════ */
+/* 1fr grid columns have a min size of the content itself, so long device
+   names ("Sound Blaster X7 Analog Stereo") blow the columns past the
+   dialog at 125–150% display scaling. minmax(0, 1fr) caps them, and the
+   dialog scrolls vertically only — never horizontally. */
+
+.modal {
+  max-height: min(86vh, 780px);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.wide-modal { width: min(760px, calc(100vw - 28px)); }
+.grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.field { min-width: 0; }
+.field select,
+.field input:not([type="checkbox"]):not([type="radio"]):not([type="color"]) {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.tabs { flex-wrap: wrap; row-gap: 2px; }
+.sub { flex-wrap: wrap; }
+.check { min-width: 0; }
+.check .hint { overflow-wrap: anywhere; }
+.net-row { flex-wrap: wrap; }
+.access-row { grid-template-columns: minmax(0, 1fr) repeat(3, minmax(60px, 92px)); }
+
+@media (max-width: 640px) {
+  .grid-2, .grid-3 { grid-template-columns: minmax(0, 1fr); }
+  .modal { padding: 16px 14px; }
+}
+
+/* ═══════════ voice-connected strip (Discord-style rail panel) ═══════════ */
+
+.voice-strip {
+  display: flex; align-items: center; gap: 6px;
+  margin: 0 8px 6px;
+  padding: 7px 8px 7px 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--seam);
+  border-radius: 9px;
+}
+.vs-info {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px;
+  background: none; border: none; cursor: pointer; text-align: left; padding: 0;
+}
+.vs-status {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.03em;
+  color: #7aa35c; text-transform: uppercase;
+}
+.vs-channel {
+  font-size: 12.5px; color: var(--parchment);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.vs-info:hover .vs-channel { color: var(--ember); }
+.vs-leave { color: var(--danger); font-size: 15px; flex: none; }

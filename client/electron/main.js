@@ -16,7 +16,13 @@ const path = require('path');
 // AcceleratedVideoEncoder: opt into VA-API hardware encode on Linux where
 // the driver offers it (Intel/AMD; NVIDIA's Linux driver has no VA-API
 // encode path, so NVIDIA boxes encode on CPU). Harmless where unsupported.
-app.commandLine.appendSwitch('enable-features', 'WebRTCPipeWireCapturer,AcceleratedVideoEncoder');
+// WebRTCPipeWireCapturer: Wayland screen share via the desktop portal.
+// AcceleratedVideoEncoder: allow hw video encode paths where present.
+// WebRtcAV1HWEncode: hw AV1 encode (NVENC/QSV/AMF) — Chromium ships this
+// OFF by default on Windows, so RTX/Arc/RDNA3 machines would otherwise
+// software-encode AV1 shares.
+app.commandLine.appendSwitch('enable-features',
+  'WebRTCPipeWireCapturer,AcceleratedVideoEncoder,WebRtcAV1HWEncode');
 
 let win = null;
 
@@ -125,9 +131,15 @@ app.whenReady().then(() => {
           types: ['screen', 'window'],
           thumbnailSize: { width: 0, height: 0 }
         });
-        const source =
-          (choice && sources.find((s) => s.id === choice.id)) || sources[0];
-        if (!source) return callback(null);
+        // Strict match only. Falling back to sources[0] here is how a
+        // machine with broken capture (WGC E_ACCESSDENIED) ends up
+        // silently sharing Hearth's own window instead of erroring.
+        const source = choice && sources.find((s) => s.id === choice.id);
+        if (!source) {
+          console.error('[share] picked source not capturable:',
+            choice?.id, '— enumerated', sources.length, 'sources');
+          return callback(null);
+        }
 
         const wantLoopback =
           choice?.withAudio && process.platform === 'win32';

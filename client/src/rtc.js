@@ -150,16 +150,27 @@ export class HearthRTC extends Emitter {
     );
   }
 
+  /**
+   * One opus profile for EVERY audio producer on a transport. libwebrtc
+   * validates codec parameters per payload type across the whole SDP, so a
+   * voice-profile mic (mono/dtx/64k) plus a music-profile screen-audio
+   * (stereo/128k) on the same transport triggers "codec collision" on PT
+   * 111 and kills renegotiation. Stereo+FEC superset, DTX off; music mode
+   * differs only in capture constraints (audio.js), never in SDP.
+   */
+  static OPUS_AUDIO_OPTIONS = {
+    opusStereo: true,
+    opusFec: true,
+    opusDtx: false,
+    opusMaxAverageBitrate: 128000
+  };
+
   async produceMic(track, { music = false } = {}) {
+    void music; // profile is constant; music mode lives in capture constraints
     const producer = await this.sendTransport.produce({
       track,
       stopTracks: false, // app owns the mic stream (meter, device swaps)
-      codecOptions: {
-        opusStereo: music,
-        opusDtx: !music,
-        opusFec: true,
-        opusMaxAverageBitrate: music ? 128000 : 64000
-      },
+      codecOptions: { ...HearthRTC.OPUS_AUDIO_OPTIONS },
       appData: { mediaTag: 'mic' }
     });
     this.producers.set('mic', producer);
@@ -192,7 +203,7 @@ export class HearthRTC extends Emitter {
     if (audioTrack) {
       const audio = await this.sendTransport.produce({
         track: audioTrack,
-        codecOptions: { opusStereo: true, opusDtx: true, opusMaxAverageBitrate: 128000 },
+        codecOptions: { ...HearthRTC.OPUS_AUDIO_OPTIONS },
         appData: { mediaTag: 'screen-audio' }
       });
       this.producers.set('screen-audio', audio);

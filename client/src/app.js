@@ -269,6 +269,7 @@ function applyDirectory(dir) {
   }
   renderRail();
   chat.refreshPermsUI();
+  updateVoiceStrip();
 
   const bp = myBasePerms();
   $('btn-add-text').classList.toggle('hidden', !has(bp, P.CREATE_CHANNELS));
@@ -467,7 +468,15 @@ async function joinChannel(channelId) {
 
   $('stage-title').textContent = state.channelName;
   $('controls').classList.remove('hidden');
-  showStage();
+  updateVoiceStrip();
+
+  // Discord behavior: connecting to voice while reading a text channel
+  // keeps the text view — the rail strip shows the connection. The stage
+  // takes over only when no text channel is open.
+  const viewingText = state.viewId &&
+    state.dirMap.get(state.viewId)?.type === 'text';
+  if (viewingText) renderRail();
+  else showStage();
 
   if (canSpeak && !state.serverMutedMe) {
     await startMic();
@@ -495,11 +504,22 @@ async function leaveChannel({ keepMic = false } = {}) {
   $('controls').classList.add('hidden');
 
   if (!keepMic) stopMicStream();
+  updateVoiceStrip();
   if (state.viewId === null || !state.dirMap.get(state.viewId) ||
       state.dirMap.get(state.viewId)?.type === 'voice') {
     state.viewId = null;
     updateEmptyStage();
     renderRail();
+  }
+}
+
+/** Rail strip mirroring Discord's "Voice Connected" panel. */
+function updateVoiceStrip() {
+  const strip = $('voice-strip');
+  strip.classList.toggle('hidden', !state.channelId);
+  if (state.channelId) {
+    $('vs-channel').textContent =
+      state.dirMap.get(state.channelId)?.name || state.channelName;
   }
 }
 
@@ -697,6 +717,15 @@ async function openSharePicker() {
     grid.textContent = 'Nothing to share was found. On Wayland, approve the screen picker when it appears.';
     return;
   }
+  if (bridge.platform === 'win32' && sources.every((s) => !s.thumbnail)) {
+    const note = document.createElement('p');
+    note.className = 'hint';
+    note.textContent =
+      'Windows returned no previews — capture access looks blocked. ' +
+      'If Hearth was launched from an Administrator terminal, close it and use a normal one. ' +
+      'On Windows 11 24H2+, also check Settings → Privacy & security → screen-capture permissions, then update the GPU driver.';
+    grid.appendChild(note);
+  }
 
   for (const s of sources) {
     const btn = document.createElement('button');
@@ -747,7 +776,10 @@ async function startShare() {
   try {
     stream = await navigator.mediaDevices.getDisplayMedia({ video, audio: withAudio });
   } catch (err) {
-    updateEmptyStage(`Screen share failed (${err.name}). On Wayland, approve the portal dialog.`);
+    const winHint = bridge.platform === 'win32'
+      ? ' Windows blocked the capture — don\u2019t launch Hearth from an Administrator terminal, and check Settings → Privacy & security → screen-capture permissions (Win11 24H2+).'
+      : ' On Wayland, approve the portal dialog.';
+    updateEmptyStage(`Screen share failed (${err.name}).${winHint}`);
     $('modal-share').close();
     return;
   }
@@ -1553,6 +1585,8 @@ function wire() {
   $('btn-leave').addEventListener('click', () => leaveChannel().catch(console.error));
   $('btn-settings').addEventListener('click', openSettings);
   $('btn-rail-settings').addEventListener('click', openSettings);
+  $('vs-info').addEventListener('click', () => { if (state.channelId) showStage(); });
+  $('btn-vs-leave').addEventListener('click', () => leaveChannel().catch(console.error));
 
   // channel management
   $('btn-add-text').addEventListener('click', () => openCreateChannel('text'));
