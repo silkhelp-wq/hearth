@@ -1,0 +1,91 @@
+# Test Plan — Hearth v0.1
+
+*Structured after ISO/IEC/IEEE 29119-3 (tailored). Traceability targets are
+the FR/NFR numbers in `SRS.md`.*
+
+## 1. Strategy
+
+Real-time media across three OSes is dominated by integration behavior, so
+the pyramid here is deliberately top-heavy — with automation where it pays:
+
+```
+        /  System / E2E (manual, cross-OS)  \   ← the product truth
+       /  Integration (server smoke, HTTP)   \
+      /  Unit (pure modules: recommend, presets)\
+```
+
+- **Unit (automated, future CI):** `recommend.js` budget math and
+  `presets.js` integrity are pure functions — the highest-value automation
+  targets. Example assertions included in §4.
+- **Integration (automated today):** `npm run selftest` boots the real
+  mediasoup worker/WebRtcServer/routers; HTTP smoke covers
+  `/health`, `/info`, `/speedtest/*`. Both are release gates.
+- **System (manual):** the TC matrix below, run on a real tailnet.
+
+**Coverage focus:** join/leave lifecycle, media correctness per preset ×
+codec, audio gating (VAD/PTT/mute/deafen), bandwidth advisor accuracy,
+reconnection, and the three OS-specific share paths. Skipped by design:
+UI pixel tests, load beyond 12 users, adversarial/security testing (out of
+scope per SRS §2).
+
+## 2. Environments
+
+| Role | Required configurations |
+|---|---|
+| Host | Linux x64 (primary; Arch/CachyOS and Ubuntu 24.04), Node 22 |
+| Clients | Linux Wayland (KDE), Linux X11, Windows 11, macOS 14+ |
+| Network | Real tailnet with ≥1 remote (non-LAN) participant; one deliberately relayed (DERP) peer if available |
+| Tooling | In-app stats overlay; `journalctl`/console logs; a second stopwatch human for latency spot-checks |
+
+Entry criteria: `npm run selftest` passes on host; client `npm run build`
+clean. Exit criteria: all **P0** pass on every client OS; P1 failures
+triaged with issues filed.
+
+## 3. System test cases
+
+Severity: **P0** = release-blocking, **P1** = should-fix.
+
+| ID | Pri | Traces | Steps | Expected |
+|---|---|---|---|---|
+| TC-01 | P0 | NFR-3 | Install & launch client on each OS (source and packaged) | App opens to connect screen; mic permission prompt on first join |
+| TC-02 | P0 | FR-1/2, NFR-5 | Fresh friend follows CONNECTION_GUIDE end-to-end | Connected in ≤10 min; console shows `linked · <ms>` |
+| TC-03 | P0 | FR-5/6 | Two clients join same channel; speak alternately | Two-way audio; ember ring follows the actual speaker within ~0.5 s; occupancy correct in rail |
+| TC-04 | P0 | FR-7 | Mid-call, switch mic; switch output device | New mic heard remotely without rejoin; already-playing audio moves to new output |
+| TC-05 | P0 | FR-9/10 | Bind PTT to a key and to Mouse4; test with app unfocused (game running) | Transmits only while held, both binds, unfocused included; fallback message if hook unavailable |
+| TC-06 | P0 | FR-9 | Set VAD threshold just above room noise; whisper vs. talk | Whisper below threshold not transmitted; speech opens gate instantly; ~0.5 s hang, no word clipping |
+| TC-07 | P0 | FR-11 | Mute; Deafen; per-person volume slider | Mute stops TX (flag visible to others); Deafen silences RX+TX; slider changes only that person locally |
+| TC-08 | P0 | FR-12/13/14/15 | Share screen at 720p60 and 1080p30; force each codec incl. AV1; watch stats overlay on a viewer | Received codec/resolution/fps match selection (±1 fps tolerance); bitrate ≈ preset target under motion |
+| TC-09 | P0 | FR-18 | Run speed test on a client whose line rate is known (router/ISP figure) | Up/down within ±20% of known figure; ping plausible for path |
+| TC-10 | P0 | FR-20/21 | Enter host-up 50, people 8, sharers 1 → Recommend → Apply | Verdict = 1080p30, budget ≈ 5.0 Mbps, "limited by host relay capacity"; Apply sets the preset (matches STREAM_SETTINGS worked example) |
+| TC-11 | P0 | NFR-1/2 | 10 users, 60 min: continuous voice + 2 concurrent 720p60 streams | No crash; no cumulative desync; host CPU (one core) < 80%; audio latency subjectively conversational |
+| TC-12 | P0 | FR-4, NFR-6 | Drop a client's network 15 s; separately restart the server mid-call | Banner shows; on recovery client auto-rejoins same channel; media resumes ≤10 s after path/server return |
+| TC-13 | P0 | FR-16 | Windows: share game window with "system audio" checked | Viewers hear game audio in sync (<200 ms AV skew); sharer's mic path unaffected |
+| TC-14 | P0 | FR-12 | Linux **Wayland/KDE**: start a screen share | PipeWire portal appears; chosen screen/window streams; no black frames |
+| TC-15 | P1 | FR-17 | End share via OS "stop sharing" control (not the app button) | Producer closes; tile disappears for all; Share button resets |
+| TC-16 | P1 | FR-8 | Music mode on; play an instrument/music through the selected input | Stereo received; no NS pumping/AGC squash vs. music mode off |
+| TC-17 | P1 | FR-13 | "Source" preset on a 4K/120 desktop | Native resolution flows; sender throttled ≤30 Mbps (server cap), stats confirm |
+| TC-18 | P1 | FR-19 | Three users run the speed test; open crew table | All three rows visible with fresh timestamps on every client |
+| TC-19 | P1 | FR-5 | Channel-hop rapidly (5 hops in 30 s) | No orphan tiles/audio; occupancy correct everywhere; server logs no handler errors |
+| TC-20 | P1 | FR-3 | Host firewall: allow only 4443/tcp + 44444/udp+tcp on tailscale0 | Full functionality (proves single-port media claim) |
+
+## 4. Unit assertions (automation backlog)
+
+```js
+// recommend.js — worked example from STREAM_SETTINGS.md
+recommend({ clientUpMbps: 100, hostUpMbps: 50, people: 8, sharers: 1 })
+  → best.id === '1080p30', limitedBy === 'host relay capacity',
+    perStreamKbps ≈ 5037 (±1)
+
+recommend({ clientUpMbps: 3, hostUpMbps: 0, people: 8, sharers: 1 })
+  → limitedBy === 'your upload', best.id === '480p30', hostUnknown === true
+
+// presets.js — table integrity
+SCREEN_PRESETS strictly ascending in kbps (excluding 'source');
+every preset id unique; OPUS_KBPS === 40
+```
+
+## 5. Reporting
+
+Record per run: date, host commit, OS matrix, per-TC pass/fail, stats-
+overlay screenshots for TC-08, and host `journalctl -u hearth-server`
+extract for any failure. File issues with TC ID in the title.

@@ -1,0 +1,22 @@
+# Hearth server systemd unit — copy to /etc/systemd/system/hearth-server.service
+# and adjust User / WorkingDirectory before enabling.
+
+[Unit]
+Description=Hearth voice/video server
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=CHANGE_ME
+WorkingDirectory=/home/CHANGE_ME/hearth/server
+ExecStart=/usr/bin/env npm start
+Restart=on-failure
+RestartSec=3
+# Optional overrides:
+# Environment=HEARTH_PORT=4443
+# Environment=HEARTH_MEDIA_PORT=44444
+# Environment=HEARTH_NAME=Hearth
+
+[Install]
+WantedBy=multi-user.target

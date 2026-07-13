@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob: mediastream:; connect-src *;" />
+  <title>Hearth</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+
+  <!-- ═══════════════ Connect ═══════════════ -->
+  <section id="screen-connect" class="screen">
+    <div class="connect-card">
+      <div class="brand">
+        <span class="brand-ember" aria-hidden="true"></span>
+        <h1>Hearth</h1>
+        <p class="tagline">your crew's own hall — voice · camera · screens</p>
+      </div>
+
+      <label class="field">
+        <span>Server address</span>
+        <input id="in-server" type="text" placeholder="http://100.x.y.z:4443"
+               spellcheck="false" autocomplete="off" />
+      </label>
+
+      <label class="field">
+        <span>Display name</span>
+        <input id="in-name" type="text" maxlength="32" placeholder="what the crew calls you"
+               spellcheck="false" autocomplete="off" />
+      </label>
+
+      <button id="btn-connect" class="btn primary wide">Step inside</button>
+
+      <pre id="connect-log" class="console" aria-live="polite"></pre>
+    </div>
+  </section>
+
+  <!-- ═══════════════ Main ═══════════════ -->
+  <section id="screen-main" class="screen hidden">
+    <aside id="rail">
+      <header class="rail-head">
+        <div class="rail-title" id="server-name">Hearth</div>
+        <div class="rail-addr mono" id="server-addr"></div>
+      </header>
+
+      <div class="rail-label mono">voice halls</div>
+      <nav id="channel-list" class="channel-list"></nav>
+
+      <footer class="self-card">
+        <div class="self-ident">
+          <span class="self-dot" id="self-dot"></span>
+          <span id="self-name" class="self-name"></span>
+        </div>
+        <div class="self-actions">
+          <button id="btn-rail-mute" class="icon-btn" title="Mute (M)">🎙</button>
+          <button id="btn-rail-deafen" class="icon-btn" title="Deafen (D)">🎧</button>
+          <button id="btn-rail-settings" class="icon-btn" title="Settings">⚙</button>
+        </div>
+      </footer>
+    </aside>
+
+    <main id="stage">
+      <header class="stage-head">
+        <h2 id="stage-title">Pick a hall</h2>
+        <div class="stage-tools">
+          <label class="check small"><input type="checkbox" id="chk-stats" /> stats</label>
+        </div>
+      </header>
+
+      <div id="tile-grid" class="tile-grid"></div>
+
+      <div id="empty-stage" class="empty-stage">
+        <p id="empty-line">Join a hall on the left to start talking.</p>
+      </div>
+
+      <div id="controls" class="controls hidden">
+        <button id="btn-mute" class="ctl" title="Mute">🎙 <span>Mute</span></button>
+        <button id="btn-deafen" class="ctl" title="Deafen">🎧 <span>Deafen</span></button>
+        <button id="btn-cam" class="ctl" title="Camera">📷 <span>Camera</span></button>
+        <button id="btn-share" class="ctl" title="Share screen">🖥 <span>Share</span></button>
+        <button id="btn-settings" class="ctl" title="Settings">⚙ <span>Settings</span></button>
+        <button id="btn-leave" class="ctl danger" title="Leave">⏻ <span>Leave</span></button>
+      </div>
+    </main>
+
+    <div id="audio-sink" aria-hidden="true"></div>
+  </section>
+
+  <!-- ═══════════════ Share picker ═══════════════ -->
+  <dialog id="modal-share" class="modal">
+    <h3>Share your screen</h3>
+    <div id="share-sources" class="share-grid"></div>
+    <div class="share-opts">
+      <label class="field slim">
+        <span>Quality</span>
+        <select id="share-preset"></select>
+      </label>
+      <label class="field slim">
+        <span>Codec</span>
+        <select id="share-codec"></select>
+      </label>
+      <label class="field slim">
+        <span>Optimize for</span>
+        <select id="share-optimize">
+          <option value="motion">Motion (gameplay, video)</option>
+          <option value="text">Text (code, documents)</option>
+        </select>
+      </label>
+      <label class="check" id="share-audio-wrap">
+        <input type="checkbox" id="share-audio" /> Share system audio
+        <em id="share-audio-note" class="hint"></em>
+      </label>
+    </div>
+    <div class="modal-actions">
+      <button id="btn-share-cancel" class="btn">Cancel</button>
+      <button id="btn-share-start" class="btn primary" disabled>Go live</button>
+    </div>
+  </dialog>
+
+  <!-- ═══════════════ Settings ═══════════════ -->
+  <dialog id="modal-settings" class="modal wide-modal">
+    <header class="modal-head">
+      <h3>Settings</h3>
+      <nav class="tabs">
+        <button class="tab active" data-tab="audio">Audio</button>
+        <button class="tab" data-tab="video">Video</button>
+        <button class="tab" data-tab="stream">Streaming</button>
+        <button class="tab" data-tab="network">Network &amp; advice</button>
+      </nav>
+      <button id="btn-settings-close" class="icon-btn" title="Close">✕</button>
+    </header>
+
+    <!-- Audio -->
+    <section class="tab-panel" data-panel="audio">
+      <div class="grid-2">
+        <label class="field"><span>Microphone</span><select id="set-mic"></select></label>
+        <label class="field"><span>Output device</span><select id="set-out"></select></label>
+      </div>
+
+      <div class="meter-row">
+        <span class="mono small">input</span>
+        <div class="meter"><div id="mic-meter" class="meter-fill"></div><div id="vad-mark" class="meter-mark"></div></div>
+        <button id="btn-mic-test" class="btn small">Test mic</button>
+      </div>
+
+      <div class="grid-2">
+        <div class="stack">
+          <label class="check"><input type="checkbox" id="set-ec" checked /> Echo cancellation</label>
+          <label class="check"><input type="checkbox" id="set-ns" checked /> Noise suppression</label>
+          <label class="check"><input type="checkbox" id="set-agc" checked /> Auto gain control</label>
+          <label class="check"><input type="checkbox" id="set-music" /> Music mode <em class="hint">stereo, processing off</em></label>
+        </div>
+        <div class="stack">
+          <span class="field-label">Activation</span>
+          <label class="check"><input type="radio" name="actmode" id="set-vad" value="vad" checked /> Voice activity</label>
+          <div class="sub">
+            <input type="range" id="set-vad-th" min="-70" max="-20" value="-45" />
+            <span class="mono small" id="vad-th-label">-45 dB</span>
+          </div>
+          <label class="check"><input type="radio" name="actmode" id="set-ptt" value="ptt" /> Push to talk</label>
+          <div class="sub">
+            <button id="btn-ptt-bind" class="btn small">Set key</button>
+            <span class="mono small" id="ptt-label">not set</span>
+            <em class="hint" id="ptt-scope"></em>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Video -->
+    <section class="tab-panel hidden" data-panel="video">
+      <div class="grid-2">
+        <label class="field"><span>Camera</span><select id="set-cam"></select></label>
+        <label class="field"><span>Camera quality</span><select id="set-cam-preset"></select></label>
+      </div>
+      <p class="hint">Camera restarts with the new device/quality next time you turn it on.</p>
+    </section>
+
+    <!-- Streaming -->
+    <section class="tab-panel hidden" data-panel="stream">
+      <div class="grid-2">
+        <label class="field"><span>Screen quality</span><select id="set-stream-preset"></select></label>
+        <label class="field"><span>Preferred codec</span><select id="set-stream-codec"></select></label>
+      </div>
+      <p class="hint">Auto lets the machines negotiate (AV1 → VP9 → H.264 → VP8, hardware permitting).
+        The server caps any single sender at 30 Mbps.</p>
+    </section>
+
+    <!-- Network -->
+    <section class="tab-panel hidden" data-panel="network">
+      <div class="net-row">
+        <button id="btn-speedtest" class="btn primary">Run speed test</button>
+        <span id="speedtest-phase" class="mono small"></span>
+        <div class="net-results mono" id="net-results"></div>
+      </div>
+
+      <div class="grid-3">
+        <label class="field slim"><span>Your upload (Mbps)</span><input type="number" id="net-up" min="0" step="0.1" /></label>
+        <label class="field slim"><span>Host upload (Mbps)</span><input type="number" id="net-hostup" min="0" step="0.1" /></label>
+        <label class="field slim"><span>People in channel</span><input type="number" id="net-people" min="2" max="16" value="8" /></label>
+      </div>
+      <div class="grid-3">
+        <label class="field slim"><span>Simultaneous streams</span><input type="number" id="net-sharers" min="1" max="4" value="1" /></label>
+        <div class="field slim"><span>&nbsp;</span>
+          <button id="btn-recommend" class="btn">Recommend settings</button>
+        </div>
+        <div class="field slim"><span>&nbsp;</span>
+          <button id="btn-apply-reco" class="btn" disabled>Apply best preset</button>
+        </div>
+      </div>
+
+      <div id="reco-out" class="reco"></div>
+
+      <div class="crew">
+        <div class="rail-label mono">crew speed reports</div>
+        <table class="crew-table mono small" id="crew-table"></table>
+      </div>
+    </section>
+  </dialog>
+
+  <template id="tpl-tile">
+    <div class="tile">
+      <video autoplay playsinline muted></video>
+      <div class="tile-name"><span class="who"></span><span class="badge"></span></div>
+      <div class="tile-stats mono hidden"></div>
+    </div>
+  </template>
+
+  <script src="./renderer.js"></script>
+</body>
+</html>

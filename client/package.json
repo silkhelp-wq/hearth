@@ -1,0 +1,54 @@
+{
+  "name": "hearth",
+  "productName": "Hearth",
+  "version": "0.1.0",
+  "description": "Self-hosted voice, camera, and screen-share hangout for your crew",
+  "license": "MIT",
+  "private": true,
+  "main": "electron/main.js",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "node esbuild.js",
+    "start": "npm run build && electron .",
+    "dist": "npm run build && electron-builder",
+    "dist:linux": "npm run build && electron-builder --linux",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:mac": "npm run build && electron-builder --mac"
+  },
+  "dependencies": {
+    "mediasoup-client": "^3.21.0",
+    "socket.io-client": "^4.8.3"
+  },
+  "optionalDependencies": {
+    "uiohook-napi": "^1.5.5"
+  },
+  "devDependencies": {
+    "electron": "^43.1.0",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.1"
+  },
+  "build": {
+    "appId": "io.magesofthebeaches.hearth",
+    "productName": "Hearth",
+    "directories": { "output": "release" },
+    "files": ["electron/**/*", "dist/**/*", "package.json"],
+    "asarUnpack": ["node_modules/uiohook-napi/**"],
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "AudioVideo;Network",
+      "maintainer": "Mages of the Beaches LLC"
+    },
+    "mac": {
+      "target": ["dmg"],
+      "category": "public.app-category.social-networking",
+      "identity": null
+    },
+    "win": {
+      "target": ["nsis"]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
