@@ -13,8 +13,10 @@ const { app, BrowserWindow, ipcMain, session, desktopCapturer } = require('elect
 const path = require('path');
 
 // Wayland: route getDisplayMedia through the xdg-desktop-portal / PipeWire.
-// Harmless on X11, Windows, and macOS.
-app.commandLine.appendSwitch('enable-features', 'WebRTCPipeWireCapturer');
+// AcceleratedVideoEncoder: opt into VA-API hardware encode on Linux where
+// the driver offers it (Intel/AMD; NVIDIA's Linux driver has no VA-API
+// encode path, so NVIDIA boxes encode on CPU). Harmless where unsupported.
+app.commandLine.appendSwitch('enable-features', 'WebRTCPipeWireCapturer,AcceleratedVideoEncoder');
 
 let win = null;
 

@@ -626,6 +626,19 @@ function statsLoop() {
         tile.classList.remove('hidden');
       }
     }
+    // Own outgoing streams: also show which encoder Chromium actually picked.
+    for (const tag of ['cam', 'screen']) {
+      const tile = document.querySelector(
+        `.tile[data-key="${CSS.escape(tileKey('self', tag))}"] .tile-stats`);
+      if (!tile) continue;
+      if (!on) { tile.classList.add('hidden'); continue; }
+      const s = await rtc.producerStats(tag);
+      if (s) {
+        tile.textContent =
+          `${s.codec} ${s.width}x${s.height}@${s.fps}\n${fmtKbps(s.kbps)} · ${shortEncoder(s.encoder)}`;
+        tile.classList.remove('hidden');
+      }
+    }
   }, 1000);
 }
 
@@ -869,6 +882,16 @@ function applyReco() {
   saveSettings();
   $('set-stream-preset').value = settings.stream.preset;
 }
+
+/** "libaom" → "sw:libaom" · "MediaFoundationVideoEncodeAccelerator" → "hw:MediaFoundation" */
+const shortEncoder = (e) => {
+  if (!e || e === '?') return '';
+  const hw = /MediaFoundation|VideoToolbox|Vaapi|V4L2|NVENC|AMF/i.test(e);
+  const name =
+    e.replace(/VideoEncodeAccelerator|EncodeAccelerator|VideoEncoder/g, '')
+      .split('(')[0].trim() || e;
+  return `${hw ? 'hw' : 'sw'}:${name}`;
+};
 
 const escapeHtml = (s) =>
   String(s).replace(/[&<>"']/g, (c) =>

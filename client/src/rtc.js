@@ -241,6 +241,38 @@ export class HearthRTC extends Emitter {
     this.emit('consumer-closed', { consumerId, peerId: entry.peerId, mediaTag: entry.mediaTag });
   }
 
+  /** { codec, encoder, fps, width, height, kbps } for an own outgoing video stream, or null. */
+  async producerStats(mediaTag) {
+    const producer = this.producers.get(mediaTag);
+    if (!producer || producer.kind !== 'video' || producer.closed) return null;
+    const stats = await producer.getStats();
+    let outbound = null;
+    const byId = new Map();
+    stats.forEach((r) => byId.set(r.id, r));
+    stats.forEach((r) => {
+      if (r.type === 'outbound-rtp' && r.kind === 'video') outbound = r;
+    });
+    if (!outbound) return null;
+
+    const store = (this._prodStats ??= new Map());
+    const prev = store.get(mediaTag) || { bytes: outbound.bytesSent, at: performance.now() };
+    const now = performance.now();
+    const kbps = now > prev.at
+      ? Math.max(0, ((outbound.bytesSent - prev.bytes) * 8) / ((now - prev.at) / 1000) / 1000)
+      : 0;
+    store.set(mediaTag, { bytes: outbound.bytesSent, at: now });
+
+    const codec = byId.get(outbound.codecId)?.mimeType?.split('/')[1] || '?';
+    return {
+      codec,
+      encoder: outbound.encoderImplementation || '?',
+      fps: Math.round(outbound.framesPerSecond || 0),
+      width: outbound.frameWidth || 0,
+      height: outbound.frameHeight || 0,
+      kbps: Math.round(kbps)
+    };
+  }
+
   /** { codec, fps, width, height, kbps } for a video consumer, or null. */
   async consumerStats(consumerId) {
     const entry = this.consumers.get(consumerId);
