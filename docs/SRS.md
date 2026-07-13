@@ -132,3 +132,33 @@ and implements no user authentication. Users range from highly technical
 v0.1 is accepted when every test case marked **P0** in `TEST_PLAN.md`
 passes on all three client OSes against a Linux host over a real tailnet,
 including the 10-user × 60-minute soak (TC-11).
+
+---
+
+## 6. v0.2 additions — identity, permissions, text chat
+
+### 6.1 Functional requirements
+
+| ID | Requirement |
+|---|---|
+| FR-20 | The client SHALL generate a persistent random identity token per install and present it on connect; the server SHALL identify users by token hash only. |
+| FR-21 | The server SHALL print an owner claim code at boot until claimed; a user entering it SHALL become owner, bypassing all permission checks and immune to mute/kick. |
+| FR-22 | The system SHALL support roles (name, color, position, permission bitfield) with `@everyone` as base, plus per-channel allow/deny overwrites for roles and members, resolved base → everyone-overwrite → role-overwrites → member-overwrite. |
+| FR-23 | Default permissions SHALL be: `@everyone` = view, send, embed links, **create channels**, connect, speak; `Admin` = administrator. Creating channels SHALL be a separate permission from managing (rename/delete/access) them. |
+| FR-24 | Users with `CREATE_CHANNELS` SHALL be able to create text and voice channels in-app; `MANAGE_CHANNELS` SHALL gate rename, topic, access overwrites, and deletion. Deleting the last channel of a type SHALL be refused. |
+| FR-25 | Text channels SHALL support sending, editing own messages, deleting own messages (or any with `MANAGE_MESSAGES`), replies, pins (`MANAGE_MESSAGES`), and unicode emoji reactions. |
+| FR-26 | Messages SHALL render safe markdown: fenced/inline code, bold/italic/strike, quotes, autolinked URLs — HTML SHALL always be escaped; images SHALL NOT be supported. |
+| FR-27 | The client SHALL show typing indicators, per-channel unread badges, and SHALL play a ping on @mention of the user's name. |
+| FR-28 | The server SHALL provide FTS5 full-text search over messages the requesting user can view. |
+| FR-29 | For authors with `EMBED_LINKS`, the server SHALL unfurl up to 3 URLs per message into **text-only** cards (title/description/site), cached 7 days, with SSRF guards (http/https only, no private ranges, 5 s / 512 KB caps). |
+| FR-30 | Chat storage SHALL live in SQLite and SHALL NOT exceed `HEARTH_CHAT_CAP_MB` (default 1024): when exceeded, the oldest messages (pins included) SHALL be pruned in batches until under the cap. |
+| FR-31 | Voice join SHALL require `VIEW_CHANNEL`+`CONNECT`; producing microphone audio SHALL require `SPEAK`. `MUTE_MEMBERS` SHALL allow moderator mute (closes live mic producer); `KICK_MEMBERS` SHALL allow disconnecting a user. The owner SHALL be immune to both. |
+| FR-32 | Channel/role/permission changes SHALL propagate live via a directory-dirty broadcast; hidden channels SHALL be excluded from a user's directory and from chat event fan-out. |
+| FR-33 | Per-user read state SHALL persist server-side and seed unread badges on connect. |
+
+### 6.2 Non-functional deltas
+
+- **NFR:** message length ≤ 4000 chars; history pages of ≤ 100.
+- **NFR:** clients older than v0.2 (no token) SHALL be rejected with a clear
+  upgrade message.
+- **NFR:** moderator-mute state MAY reset on server restart (in-memory).

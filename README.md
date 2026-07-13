@@ -1,8 +1,8 @@
 # Hearth
 
-Self-hosted voice, camera, and screen-share hangout for a fixed crew of
-friends. One of you runs the server; everyone else pastes one address into
-the desktop app. No accounts, no cloud, no port forwarding — connectivity
+Self-hosted voice, camera, screen-share, and text-chat hangout for a fixed
+crew of friends. One of you runs the server; everyone else pastes one address
+into the desktop app. No accounts, no cloud, no port forwarding — connectivity
 rides on your [Tailscale](https://tailscale.com) tailnet.
 
 - **Voice channels** with device selection, echo cancellation / noise
@@ -14,6 +14,16 @@ rides on your [Tailscale](https://tailscale.com) tailnet.
 - **Built-in speed test** that measures the real path to your server and a
   **recommendation engine** that turns the crew's numbers into the highest
   preset that actually fits — including the host relay math
+- **Text channels** (v0.2) with replies, edits, pins, emoji reactions,
+  markdown + code blocks, typing indicators, unread badges, @mention pings,
+  full-text search, and text-only link preview cards
+- **Discord-style roles & permissions**: per-channel allow/deny overwrites,
+  role colors, a claimable server owner, moderator mute/kick — with one
+  deliberate twist: *creating* channels is split from *managing* them, so the
+  default is "everyone creates, Admins delete"
+- **Storage that never grows past 1 GB**: chat lives in SQLite; when the cap
+  is hit the oldest messages are pruned automatically (a text-only crew of 8
+  takes roughly a decade to get there)
 - **Cross-platform**: Linux, Windows, macOS (Electron)
 
 ## Quick start (host, ~5 minutes)
@@ -56,7 +66,7 @@ single port (44444/udp+tcp), so there is nothing to configure on any router.
 
 Every push runs CI (`.github/workflows/ci.yml`): the server boots the real
 mediasoup stack (`npm run selftest`) and the client renderer must bundle
-clean. Pushing a tag like `v0.1.0` triggers the release workflow, which
+clean. Pushing a tag like `v0.2.0` triggers the release workflow, which
 builds installers on GitHub's Linux/Windows/macOS runners and attaches
 `.AppImage`/`.deb`/`.exe`/`.dmg` files to the release — friends grab theirs
 from the **Releases** page, no build tools needed.
@@ -71,8 +81,13 @@ Server environment variables (all optional):
 | `HEARTH_MEDIA_PORT` | `44444` | Single UDP/TCP media port |
 | `HEARTH_ANNOUNCED_IP` | autodetect | Address clients reach media on (Tailscale preferred) |
 | `HEARTH_NAME` | `Hearth` | Server display name |
+| `HEARTH_DATA_DIR` | `server/data` | SQLite database + state directory |
+| `HEARTH_CHAT_CAP_MB` | `1024` | Chat DB size cap; oldest messages pruned past it |
 
-Channels are just strings in `server/channels.json`.
+`server/channels.json` seeds the voice channel list on **first boot only**;
+after that, channels are created and deleted inside the app (permission-gated).
+The first boot also prints an **owner claim code** — enter it under
+Settings → Server to take ownership of the hall.
 
 ## License
 

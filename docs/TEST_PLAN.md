@@ -89,3 +89,23 @@ every preset id unique; OPUS_KBPS === 40
 Record per run: date, host commit, OS matrix, per-TC pass/fail, stats-
 overlay screenshots for TC-08, and host `journalctl -u hearth-server`
 extract for any failure. File issues with TC ID in the title.
+
+---
+
+## v0.2 test cases — identity, permissions, chat
+
+| ID | Case | Steps | Expected |
+|---|---|---|---|
+| TC-21 | Owner claim | Boot fresh server; enter console code in Settings → Server | Claimer becomes owner (★); code stops printing; wrong code rejected |
+| TC-22 | Default create/delete split | As a fresh (roleless) user: create a text channel; try to delete any channel | Create succeeds; delete button absent / request refused |
+| TC-23 | Admin delete | Owner assigns Admin role; Admin deletes a channel | Channel and its messages disappear for everyone live |
+| TC-24 | View overwrite hides | Deny `view` for `@everyone` on a channel; check second client | Channel vanishes from rail; its events stop arriving; member-allow for one user brings it back for them only |
+| TC-25 | Speak gating | Deny `speak` on a voice hall for a role; member joins | Join succeeds listen-only; mic produce refused with message |
+| TC-26 | Moderator mute/kick | Admin mutes then kicks a member in voice | Target's mic drops instantly + 🔕 flag; unmute restores; kick disconnects with attribution; owner immune |
+| TC-27 | Chat E2E | Send, reply, edit, delete, pin, react from two clients | All render live on both; (edited) flag; delete removes; reply jump works |
+| TC-28 | Mentions & unread | Mention a user viewing another channel | Ping sound + ember badge count; opening channel clears; plain messages show dot only |
+| TC-29 | Search | Post a distinctive phrase; search it in-channel | Result row jumps to the message with flash highlight |
+| TC-30 | Link preview | Send a public https URL | Text-only card (site/title/description) appears within seconds; `http://192.168.…` never unfurls |
+| TC-31 | Rolling prune | Set `HEARTH_CHAT_CAP_MB=1`, spam messages, wait for prune (or reboot) | Oldest messages removed until under cap; server log line; newest retained |
+| TC-32 | Old client rejected | Connect with a v0.1 build | Clear "requires Hearth v0.2+" error on the connect screen |
+| TC-33 | Markdown safety | Send `<img onerror=…>` and a fenced code block | Renders as escaped text / code; no HTML executes |

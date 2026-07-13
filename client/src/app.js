@@ -1,6 +1,6 @@
 /**
  * Hearth renderer application — glue between the UI skeleton, HearthRTC,
- * the audio toolkit, and the Electron bridge (window.hearth).
+ * the chat module, the audio toolkit, and the Electron bridge.
  */
 
 import { HearthRTC } from './rtc.js';
@@ -8,6 +8,9 @@ import { listDevices, getMicStream, getCamStream, MicMeter, VadGate, applyOutput
 import { SCREEN_PRESETS, CAM_PRESETS, VIDEO_CODECS, preset, OPUS_KBPS } from './presets.js';
 import { recommend, fmtKbps } from './recommend.js';
 import { runFullTest, fetchCrewReports } from './speedtest.js';
+import { createChat } from './chat.js';
+import { mentionsMe } from './markdown.js';
+import { P, ALL, PERM_LABELS, has, basePerms } from './permbits.js';
 
 const $ = (id) => document.getElementById(id);
 const bridge = window.hearth || {
@@ -25,6 +28,7 @@ const bridge = window.hearth || {
 const DEFAULTS = {
   serverUrl: '',
   displayName: '',
+  identity: { token: '' },
   audio: {
     inId: '', outId: '',
     ec: true, ns: true, agc: true, music: false,
@@ -42,6 +46,7 @@ function loadSettings() {
     return {
       ...structuredClone(DEFAULTS),
       ...raw,
+      identity: { ...DEFAULTS.identity, ...raw.identity },
       audio: { ...DEFAULTS.audio, ...raw.audio },
       video: { ...DEFAULTS.video, ...raw.video },
       stream: { ...DEFAULTS.stream, ...raw.stream },
@@ -53,15 +58,36 @@ const settings = loadSettings();
 const saveSettings = () =>
   localStorage.setItem('hearth-settings-v1', JSON.stringify(settings));
 
+/** Device identity: one random token per install. New token = new person. */
+function ensureToken() {
+  if (!settings.identity.token || settings.identity.token.length < 24) {
+    const rand = crypto.getRandomValues(new Uint8Array(16));
+    settings.identity.token = `${crypto.randomUUID()}-${[...rand]
+      .map((b) => b.toString(16).padStart(2, '0')).join('')}`;
+    saveSettings();
+  }
+  return settings.identity.token;
+}
+
 /* ─────────────────────────────── state ──────────────────────────────── */
 
 const rtc = new HearthRTC();
 
 const state = {
   connected: false,
-  channelId: null,
+  me: null,               // {id, name, isOwner}
+  users: new Map(),       // userId -> {id, name, isOwner, roleIds, online}
+  roles: [],
+  dirMap: new Map(),      // channelId -> directory entry (with myPerms)
+  viewId: null,           // channel currently on the stage (text or voice)
+  unread: new Map(),      // channelId -> {count, mention}
+  readState: {},          // channelId -> last read message id
+  ownerClaimed: true,
+  serverMutedMe: false,
+  canSpeak: true,
+  channelId: null,        // connected voice channel
   channelName: '',
-  peers: new Map(),      // peerId -> {name, state}
+  peers: new Map(),       // peerId -> {name, userId, state}
   directory: [],
   muted: false,
   deafened: false,
@@ -74,9 +100,13 @@ const state = {
   camStream: null,
   screenStream: null,
   micTestEl: null,
-  volumes: new Map(),    // peerId -> 0..1
+  volumes: new Map(),     // peerId -> 0..1
   lastReco: null,
-  statsTimer: null
+  statsTimer: null,
+  editingChannel: null,
+  editingRole: null,
+  accessDraft: null,      // roleId -> {perm -> 'inherit'|'allow'|'deny'}
+  pendingAfterHello: null // {voice, view} rejoin targets after reconnect
 };
 
 const vad = new VadGate({
@@ -84,6 +114,54 @@ const vad = new VadGate({
   onOpen: () => { state.vadOpen = true; applyMicGate(); },
   onClose: () => { state.vadOpen = false; applyMicGate(); }
 });
+
+const myBasePerms = () =>
+  basePerms(state.me, state.roles, state.users.get(state.me?.id)?.roleIds || []);
+
+/* ─────────────────────────────── chat ───────────────────────────────── */
+
+const chat = createChat({
+  rtc,
+  getMe: () => state.me || { id: '', name: settings.displayName },
+  getUsers: () => state.users,
+  getRoles: () => state.roles,
+  getChannel: (id) => state.dirMap.get(id),
+  onIncoming,
+  onRead
+});
+
+function onIncoming(channelId, m) {
+  if (!state.me || m.authorId === state.me.id) return;
+  const cur = state.unread.get(channelId) || { count: 0, mention: false };
+  cur.count += 1;
+  if (mentionsMe(m.content, state.me.name)) { cur.mention = true; playPing(); }
+  state.unread.set(channelId, cur);
+  renderRail();
+}
+
+function onRead(channelId, lastId) {
+  state.readState[channelId] = Math.max(state.readState[channelId] || 0, lastId);
+  state.unread.delete(channelId);
+  renderRail();
+}
+
+let pingCtx = null;
+function playPing() {
+  try {
+    pingCtx = pingCtx || new AudioContext();
+    const t = pingCtx.currentTime;
+    for (const [freq, at] of [[880, 0], [660, 0.09]]) {
+      const osc = pingCtx.createOscillator();
+      const gain = pingCtx.createGain();
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, t + at);
+      gain.gain.exponentialRampToValueAtTime(0.12, t + at + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + at + 0.16);
+      osc.connect(gain).connect(pingCtx.destination);
+      osc.start(t + at); osc.stop(t + at + 0.18);
+    }
+  } catch { /* audio not ready */ }
+}
 
 /* ─────────────────────────── connect screen ─────────────────────────── */
 
@@ -95,6 +173,9 @@ function logLine(text, cls = '') {
   log.appendChild(span);
   log.scrollTop = log.scrollHeight;
 }
+
+let rawWired = false;
+let helloResolve = null;
 
 async function doConnect() {
   const url = normalizeUrl($('in-server').value.trim());
@@ -112,19 +193,22 @@ async function doConnect() {
 
   try {
     const t0 = performance.now();
-    await rtc.connect(url);
+    await rtc.connect(url, { token: ensureToken(), name });
+    if (!rawWired) { wireRaw(); chat.wire(); rawWired = true; }
+
+    const hello = await new Promise((resolve, reject) => {
+      helloResolve = resolve;
+      setTimeout(() => reject(new Error('server never said hello — is it v0.2+?')), 8000);
+    });
     logLine(`> linked · ${Math.round(performance.now() - t0)} ms`, 'ok');
 
-    const info = await fetch(`${url}/info`).then((r) => r.json()).catch(() => null);
-    const dir = await rtc.channels();
-    onDirectory(dir);
+    const online = hello.channels.reduce((n, c) => n + c.peers.length, 0);
+    logLine(`> ${hello.serverName || 'hall'} is open — ${online} in voice`, 'ok');
+    if (!hello.ownerClaimed) {
+      logLine('> this hall has no owner yet — the claim code is in the server console', 'ok');
+    }
 
-    const online = dir.reduce((n, c) => n + c.peers.length, 0);
-    logLine(`> ${info?.name || 'hall'} is open — ${online} inside`, 'ok');
-
-    $('server-name').textContent = info?.name || 'Hearth';
     $('server-addr').textContent = url.replace(/^https?:\/\//, '');
-    $('self-name').textContent = name;
 
     setTimeout(() => {
       $('screen-connect').classList.add('hidden');
@@ -147,14 +231,126 @@ function normalizeUrl(input) {
   return url.replace(/\/+$/, '');
 }
 
+/* ─────────────────────────── hello / directory ──────────────────────── */
+
+function applyHello(h) {
+  state.me = h.user;
+  state.roles = h.roles || [];
+  state.users = new Map((h.users || []).map((u) => [u.id, u]));
+  state.readState = h.readState || {};
+  state.ownerClaimed = !!h.ownerClaimed;
+  $('server-name').textContent = h.serverName || 'Hearth';
+  $('self-name').textContent = state.me.name;
+
+  applyDirectory(h.channels || []);
+  renderServerPanel();
+
+  const after = state.pendingAfterHello;
+  state.pendingAfterHello = null;
+  if (after?.voice && state.dirMap.has(after.voice)) {
+    joinChannel(after.voice).catch(console.error);
+  }
+  if (after?.view) {
+    const ch = state.dirMap.get(after.view);
+    if (ch?.type === 'text') viewText(ch);
+  }
+}
+
+function applyDirectory(dir) {
+  state.directory = dir;
+  state.dirMap = new Map(dir.map((c) => [c.id, c]));
+
+  // Viewed channel vanished (deleted or hidden by an overwrite)?
+  if (state.viewId && !state.dirMap.has(state.viewId)) {
+    if (chat.current() === state.viewId) chat.close();
+    state.viewId = null;
+    showStage();
+    updateEmptyStage('That channel is gone.');
+  }
+  renderRail();
+  chat.refreshPermsUI();
+
+  const bp = myBasePerms();
+  $('btn-add-text').classList.toggle('hidden', !has(bp, P.CREATE_CHANNELS));
+  $('btn-add-voice').classList.toggle('hidden', !has(bp, P.CREATE_CHANNELS));
+  if (state.viewId) {
+    const ch = state.dirMap.get(state.viewId);
+    $('chat-edit-btn').classList.toggle('hidden',
+      !(ch?.type === 'text' && has(ch.myPerms, P.MANAGE_CHANNELS)));
+  }
+}
+
 /* ──────────────────────────── channel rail ──────────────────────────── */
 
-function onDirectory(dir) {
-  state.directory = dir;
+function renderRail() {
+  renderTextList();
+  renderVoiceList();
+}
+
+function chanTools(ch) {
+  const tools = document.createElement('span');
+  tools.className = 'chan-tools';
+  if (has(ch.myPerms, P.MANAGE_CHANNELS)) {
+    const edit = document.createElement('button');
+    edit.className = 'edit'; edit.textContent = '⚙'; edit.title = 'Channel settings';
+    edit.addEventListener('click', (e) => { e.stopPropagation(); openChannelEdit(ch); });
+    tools.appendChild(edit);
+
+    const del = document.createElement('button');
+    del.textContent = '🗑'; del.title = 'Delete channel';
+    del.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const what = ch.type === 'text' ? `#${ch.name} and all its messages` : `the ${ch.name} hall`;
+      if (!confirm(`Delete ${what}? This cannot be undone.`)) return;
+      rtc.request('channel:delete', { channelId: ch.id }).catch((err) => alert(err.message));
+    });
+    tools.appendChild(del);
+  }
+  return tools;
+}
+
+function renderTextList() {
+  const list = $('text-list');
+  list.textContent = '';
+  for (const ch of state.directory.filter((c) => c.type === 'text')) {
+    const el = document.createElement('div');
+    el.className = 'channel chan-row' + (ch.id === state.viewId ? ' current' : '');
+    el.dataset.id = ch.id;
+
+    const nameRow = document.createElement('div');
+    nameRow.className = 'channel-name';
+    const label = document.createElement('span');
+    label.className = 'chan-name';
+    label.textContent = `# ${ch.name}`;
+    nameRow.appendChild(label);
+    nameRow.appendChild(chanTools(ch));
+
+    const info = state.unread.get(ch.id);
+    const read = state.readState[ch.id] || 0;
+    if (info?.count) {
+      const b = document.createElement('span');
+      b.className = 'chan-badge' + (info.mention ? ' mention' : '');
+      b.textContent = info.count > 99 ? '99+' : String(info.count);
+      nameRow.appendChild(b);
+      el.classList.add('unread');
+    } else if ((ch.lastMessageId || 0) > read) {
+      const d = document.createElement('span');
+      d.className = 'chan-dot';
+      nameRow.appendChild(d);
+      el.classList.add('unread');
+    }
+
+    el.appendChild(nameRow);
+    el.addEventListener('click', () => viewText(ch));
+    list.appendChild(el);
+  }
+}
+
+function renderVoiceList() {
   const list = $('channel-list');
   list.textContent = '';
 
-  for (const ch of dir) {
+  for (const ch of state.directory.filter((c) => c.type === 'voice')) {
     const el = document.createElement('div');
     el.className = 'channel' +
       (ch.peers.length ? ' occupied' : '') +
@@ -167,6 +363,7 @@ function onDirectory(dir) {
     const label = document.createElement('span');
     label.textContent = ch.name;
     nameRow.appendChild(label);
+    nameRow.appendChild(chanTools(ch));
     el.appendChild(nameRow);
 
     if (ch.peers.length) {
@@ -175,6 +372,10 @@ function onDirectory(dir) {
       for (const p of ch.peers) peersBox.appendChild(railPeerRow(p, ch.id));
       el.appendChild(peersBox);
     }
+    el.addEventListener('click', () => {
+      if (ch.id === state.channelId) showStage();
+      else joinChannel(ch.id).catch((err) => updateEmptyStage(err.message));
+    });
     list.appendChild(el);
   }
 }
@@ -202,6 +403,7 @@ function railPeerRow(p, channelId) {
     vol.type = 'range'; vol.min = 0; vol.max = 100;
     vol.value = Math.round((state.volumes.get(p.id) ?? 1) * 100);
     vol.title = 'Volume';
+    vol.addEventListener('click', (e) => e.stopPropagation());
     vol.addEventListener('input', () => {
       const v = vol.value / 100;
       state.volumes.set(p.id, v);
@@ -209,21 +411,43 @@ function railPeerRow(p, channelId) {
     });
     row.appendChild(vol);
   }
-  refreshPeerFlags(row, p.id);
+  refreshPeerFlags(row, p.id, p.state);
   return row;
 }
 
-function refreshPeerFlags(row, peerId) {
-  const st = state.peers.get(peerId)?.state;
+function refreshPeerFlags(row, peerId, fallbackState = null) {
+  const st = state.peers.get(peerId)?.state || fallbackState;
   const flags = row.querySelector('.flags');
   if (!st || !flags) return;
   flags.textContent =
-    (st.deafened ? '⛔' : st.muted ? '🔇' : '') + (st.sharing ? ' 🖥' : '');
+    (st.serverMuted ? '🔕' : st.deafened ? '⛔' : st.muted ? '🔇' : '') +
+    (st.sharing ? ' 🖥' : '');
 }
 
 function refreshRailStates() {
   document.querySelectorAll('.rail-peer').forEach((row) =>
     refreshPeerFlags(row, row.dataset.peer));
+}
+
+/* ─────────────────────────── stage switching ────────────────────────── */
+
+function viewText(ch) {
+  state.viewId = ch.id;
+  $('stage-head').classList.add('hidden');
+  $('tile-grid').classList.add('hidden');
+  $('empty-stage').classList.add('hidden');
+  $('chat-edit-btn').classList.toggle('hidden', !has(ch.myPerms, P.MANAGE_CHANNELS));
+  chat.open(ch).catch((err) => console.error('[chat]', err));
+  renderRail();
+}
+
+function showStage() {
+  chat.close();
+  state.viewId = state.channelId;
+  $('stage-head').classList.remove('hidden');
+  $('tile-grid').classList.remove('hidden');
+  updateEmptyStage();
+  renderRail();
 }
 
 /* ─────────────────────────── join / leave ───────────────────────────── */
@@ -233,19 +457,26 @@ async function joinChannel(channelId) {
 
   if (state.channelId) await leaveChannel({ keepMic: true });
 
-  const { peers } = await rtc.join(channelId, settings.displayName);
+  const { peers, canSpeak } = await rtc.join(channelId);
   state.channelId = channelId;
-  state.channelName =
-    state.directory.find((c) => c.id === channelId)?.name || 'hall';
+  state.canSpeak = canSpeak;
+  state.channelName = state.dirMap.get(channelId)?.name || 'hall';
 
   state.peers.clear();
-  for (const p of peers) state.peers.set(p.id, { name: p.name, state: p.state });
+  for (const p of peers) state.peers.set(p.id, { name: p.name, userId: p.userId, state: p.state });
 
   $('stage-title').textContent = state.channelName;
   $('controls').classList.remove('hidden');
-  updateEmptyStage();
+  showStage();
 
-  await startMic();
+  if (canSpeak && !state.serverMutedMe) {
+    await startMic();
+  } else {
+    stopMicStream();
+    updateEmptyStage(state.serverMutedMe
+      ? 'A moderator muted you — you can listen, but not speak.'
+      : 'You can listen here, but you do not have permission to speak.');
+  }
   await broadcastState();
 }
 
@@ -259,11 +490,17 @@ async function leaveChannel({ keepMic = false } = {}) {
   state.peers.clear();
   state.channelId = null;
   state.channelName = '';
+  state.canSpeak = true;
   $('stage-title').textContent = 'Pick a hall';
   $('controls').classList.add('hidden');
 
   if (!keepMic) stopMicStream();
-  updateEmptyStage();
+  if (state.viewId === null || !state.dirMap.get(state.viewId) ||
+      state.dirMap.get(state.viewId)?.type === 'voice') {
+    state.viewId = null;
+    updateEmptyStage();
+    renderRail();
+  }
 }
 
 /* ───────────────────────────── mic engine ───────────────────────────── */
@@ -286,7 +523,9 @@ async function startMic() {
 
   const track = state.micStream.getAudioTracks()[0];
   if (rtc.producers.has('mic')) await rtc.replaceMicTrack(track);
-  else if (rtc.joined) await rtc.produceMic(track, { music: settings.audio.music });
+  else if (rtc.joined && state.canSpeak && !state.serverMutedMe) {
+    await rtc.produceMic(track, { music: settings.audio.music });
+  }
 
   state.micMeter = new MicMeter(state.micStream, onMicLevel);
   applyMicGate();
@@ -312,13 +551,14 @@ function onMicLevel(level, db) {
   $('self-dot').classList.toggle('speaking', transmitting);
 }
 
-const micTransmitting = () => !state.muted && !state.deafened && rtc.producers.has('mic');
+const micTransmitting = () =>
+  !state.muted && !state.deafened && !state.serverMutedMe && rtc.producers.has('mic');
 
 function applyMicGate() {
   const track = state.micStream?.getAudioTracks()[0];
   if (!track) return;
   const gateOpen = settings.audio.mode === 'ptt' ? state.pttDown : state.vadOpen;
-  track.enabled = !state.muted && !state.deafened && gateOpen;
+  track.enabled = !state.muted && !state.deafened && !state.serverMutedMe && gateOpen;
 }
 
 function setMuted(muted) {
@@ -347,6 +587,28 @@ const broadcastState = () =>
         camOn: state.camOn, sharing: state.sharing
       }).catch(() => {})
     : Promise.resolve();
+
+function setServerMuted(muted) {
+  state.serverMutedMe = muted;
+  applyMicGate();
+  let chip = $('srv-muted-chip');
+  if (muted) {
+    if (!chip) {
+      chip = document.createElement('span');
+      chip.id = 'srv-muted-chip';
+      chip.className = 'srv-muted-chip';
+      chip.textContent = 'muted by moderator';
+      $('controls').prepend(chip);
+    }
+  } else {
+    chip?.remove();
+    // Producer was closed server-side; bring the mic back if allowed.
+    const track = state.micStream?.getAudioTracks()[0];
+    if (track && rtc.joined && state.canSpeak && !rtc.producers.has('mic')) {
+      rtc.produceMic(track, { music: settings.audio.music }).catch(console.error);
+    }
+  }
+}
 
 /* ────────────────────────────── camera ──────────────────────────────── */
 
@@ -423,7 +685,7 @@ async function openSharePicker() {
   $('share-audio').checked = win;
   $('share-audio-note').textContent = win
     ? 'captures what Windows is playing'
-    : 'system audio capture is Windows-only in v0.1 — your mic still works';
+    : 'system audio capture is Windows-only for now — your mic still works';
 
   $('modal-share').showModal();
 
@@ -551,6 +813,7 @@ const audioEls = (peerId) =>
   document.querySelectorAll(`#audio-sink audio[data-peer="${CSS.escape(peerId)}"]`);
 
 function updateEmptyStage(message) {
+  if (state.viewId && state.dirMap.get(state.viewId)?.type === 'text') return;
   const hasTiles = Boolean(document.querySelector('#tile-grid .tile'));
   $('empty-stage').classList.toggle('hidden', hasTiles);
   if (message) $('empty-line').textContent = message;
@@ -582,7 +845,7 @@ rtc.on('consumer-closed', ({ consumerId, peerId, mediaTag }) => {
 });
 
 rtc.on('peer-joined', (p) => {
-  state.peers.set(p.id, { name: p.name, state: p.state });
+  state.peers.set(p.id, { name: p.name, userId: p.userId, state: p.state });
 });
 
 rtc.on('peer-left', ({ id }) => {
@@ -598,8 +861,6 @@ rtc.on('peer-state', ({ id, state: st }) => {
   refreshRailStates();
 });
 
-rtc.on('channels', onDirectory);
-
 rtc.on('speaker', ({ peerId }) => {
   document.querySelectorAll('.rail-peer').forEach((row) =>
     row.classList.toggle('speaking', row.dataset.peer === peerId));
@@ -607,6 +868,358 @@ rtc.on('speaker', ({ peerId }) => {
     tile.classList.toggle('speaking',
       tile.dataset.peer === peerId && tile.dataset.key.endsWith(':cam')));
 });
+
+/* ──────────────────────── v0.2 raw server events ────────────────────── */
+
+function wireRaw() {
+  rtc.onRaw('hello', (h) => {
+    applyHello(h);
+    helloResolve?.(h);
+    helloResolve = null;
+  });
+
+  rtc.onRaw('dir:dirty', async () => {
+    const list = await rtc.request('channels:list').catch(() => null);
+    if (Array.isArray(list)) applyDirectory(list);
+  });
+
+  rtc.onRaw('users:update', (users) => {
+    state.users = new Map((users || []).map((u) => [u.id, u]));
+    if (state.me) {
+      const me = state.users.get(state.me.id);
+      if (me) { state.me.isOwner = me.isOwner; state.me.name = me.name; }
+    }
+    renderServerPanel();
+    renderRail();
+  });
+
+  rtc.onRaw('roles:update', (roles) => {
+    state.roles = roles || [];
+    renderServerPanel();
+    renderRail();
+  });
+
+  rtc.onRaw('force:muted', ({ muted }) => setServerMuted(!!muted));
+
+  rtc.onRaw('kicked', ({ by }) => {
+    alert(`You were kicked from the hall by ${by}.`);
+    window.location.reload();
+  });
+
+  rtc.onRaw('room:closed', () => {
+    leaveChannel().catch(console.error);
+    updateEmptyStage('That hall was deleted.');
+  });
+}
+
+/* ───────────────────────── channel management ───────────────────────── */
+
+function openCreateChannel(type) {
+  $('chan-name').value = '';
+  document.querySelector(`input[name="chantype"][value="${type}"]`).checked = true;
+  $('modal-channel').showModal();
+  $('chan-name').focus();
+}
+
+async function createChannel() {
+  const name = $('chan-name').value.trim();
+  const type = document.querySelector('input[name="chantype"]:checked').value;
+  if (!name) return;
+  try {
+    const { channel } = await rtc.request('channel:create', { name, type });
+    $('modal-channel').close();
+    const list = await rtc.request('channels:list');
+    if (Array.isArray(list)) applyDirectory(list);
+    if (channel.type === 'text') {
+      const ch = state.dirMap.get(channel.id);
+      if (ch) viewText(ch);
+    }
+  } catch (err) { alert(err.message); }
+}
+
+const ACCESS_PERMS = {
+  text: [[P.VIEW_CHANNEL, 'view'], [P.SEND_MESSAGES, 'send'], [P.EMBED_LINKS, 'links']],
+  voice: [[P.VIEW_CHANNEL, 'view'], [P.CONNECT, 'connect'], [P.SPEAK, 'speak']]
+};
+
+async function openChannelEdit(ch) {
+  state.editingChannel = ch;
+  $('chanedit-title').textContent =
+    ch.type === 'text' ? `# ${ch.name} — settings` : `${ch.name} — settings`;
+  $('chanedit-name').value = ch.name;
+  $('chanedit-topic').value = ch.topic || '';
+
+  let overwrites = [];
+  try {
+    ({ overwrites } = await rtc.request('channel:overwrites:get', { channelId: ch.id }));
+  } catch (err) { alert(err.message); return; }
+
+  const perms = ACCESS_PERMS[ch.type];
+  const grid = $('access-grid');
+  grid.textContent = '';
+  state.accessDraft = new Map();
+
+  const head = document.createElement('div');
+  head.className = 'access-row';
+  head.innerHTML = `<span></span>` +
+    perms.map(([, label]) => `<span class="access-head">${label}</span>`).join('');
+  grid.appendChild(head);
+
+  const roles = [...state.roles].sort((a, b) => b.position - a.position);
+  for (const role of roles) {
+    const existing = overwrites.find(
+      (o) => o.target_type === 'role' && o.target_id === role.id);
+    const draft = {};
+    const row = document.createElement('div');
+    row.className = 'access-row';
+
+    const name = document.createElement('span');
+    name.className = 'access-role';
+    name.textContent = role.name;
+    name.style.color = role.color;
+    row.appendChild(name);
+
+    for (const [bit] of perms) {
+      const cur = existing && (existing.allow & bit) ? 'allow'
+        : existing && (existing.deny & bit) ? 'deny' : 'inherit';
+      draft[bit] = cur;
+      const btn = document.createElement('button');
+      btn.className = 'tri';
+      btn.dataset.state = cur;
+      btn.textContent = cur;
+      btn.addEventListener('click', () => {
+        const nxt = { inherit: 'allow', allow: 'deny', deny: 'inherit' }[btn.dataset.state];
+        btn.dataset.state = nxt;
+        btn.textContent = nxt;
+        draft[bit] = nxt;
+      });
+      row.appendChild(btn);
+    }
+    state.accessDraft.set(role.id, draft);
+    grid.appendChild(row);
+  }
+  $('modal-channel-edit').showModal();
+}
+
+async function saveChannelEdit() {
+  const ch = state.editingChannel;
+  if (!ch) return;
+  try {
+    await rtc.request('channel:update', {
+      channelId: ch.id,
+      name: $('chanedit-name').value.trim() || ch.name,
+      topic: $('chanedit-topic').value.trim()
+    });
+    for (const [roleId, draft] of state.accessDraft) {
+      let allow = 0, deny = 0;
+      for (const [bit, mode] of Object.entries(draft)) {
+        if (mode === 'allow') allow |= Number(bit);
+        if (mode === 'deny') deny |= Number(bit);
+      }
+      await rtc.request('channel:overwrites:set', {
+        channelId: ch.id, targetType: 'role', targetId: roleId, allow, deny
+      });
+    }
+    $('modal-channel-edit').close();
+  } catch (err) { alert(err.message); }
+}
+
+/* ───────────────────────── server panel (roles) ─────────────────────── */
+
+function renderServerPanel() {
+  if (!state.me) return;
+  const bp = myBasePerms();
+
+  $('srv-owner-row').classList.toggle('hidden', state.ownerClaimed);
+  $('btn-add-role').classList.toggle('hidden', !has(bp, P.MANAGE_ROLES));
+
+  // members
+  const members = $('srv-members');
+  members.textContent = '';
+  const sorted = [...state.users.values()]
+    .sort((a, b) => Number(b.online) - Number(a.online) || a.name.localeCompare(b.name));
+  for (const u of sorted) {
+    const row = document.createElement('div');
+    row.className = 'srv-row';
+    row.innerHTML = `<span class="srv-dot${u.online ? ' on' : ''}"></span>`;
+    const name = document.createElement('span');
+    name.className = 'srv-name';
+    name.textContent = u.name;
+    row.appendChild(name);
+    if (u.isOwner) {
+      const star = document.createElement('span');
+      star.className = 'srv-owner-star';
+      star.textContent = '★ owner';
+      row.appendChild(star);
+    }
+
+    for (const role of [...state.roles].sort((a, b) => b.position - a.position)) {
+      if (role.id === 'everyone') continue;
+      const hasIt = u.roleIds.includes(role.id);
+      const chip = document.createElement('button');
+      chip.className = 'role-chip' + (hasIt ? '' : ' off') +
+        (has(bp, P.MANAGE_ROLES) ? ' toggle' : '');
+      chip.style.color = role.color;
+      chip.textContent = role.name;
+      chip.title = has(bp, P.MANAGE_ROLES) ? 'Toggle role' : role.name;
+      if (has(bp, P.MANAGE_ROLES)) {
+        chip.addEventListener('click', () =>
+          rtc.request('role:assign', { userId: u.id, roleId: role.id, on: !hasIt })
+            .catch((err) => alert(err.message)));
+      }
+      row.appendChild(chip);
+    }
+
+    const spacer = document.createElement('span');
+    spacer.className = 'spacer';
+    row.appendChild(spacer);
+
+    if (u.id !== state.me.id && !u.isOwner) {
+      if (has(bp, P.MUTE_MEMBERS)) {
+        const curMuted = isServerMutedInDir(u.id);
+        const mute = document.createElement('button');
+        mute.className = 'srv-act';
+        mute.textContent = curMuted ? '🔕 unmute' : '🔇 mute';
+        mute.title = 'Server mute (voice)';
+        mute.addEventListener('click', () =>
+          rtc.request('member:mute', { userId: u.id, muted: !curMuted })
+            .catch((err) => alert(err.message)));
+        row.appendChild(mute);
+      }
+      if (has(bp, P.KICK_MEMBERS)) {
+        const kick = document.createElement('button');
+        kick.className = 'srv-act danger';
+        kick.textContent = 'kick';
+        kick.addEventListener('click', () => {
+          if (confirm(`Kick ${u.name}? They can rejoin unless you change permissions.`)) {
+            rtc.request('member:kick', { userId: u.id }).catch((err) => alert(err.message));
+          }
+        });
+        row.appendChild(kick);
+      }
+    }
+    members.appendChild(row);
+  }
+
+  // roles
+  const rolesBox = $('srv-roles');
+  rolesBox.textContent = '';
+  for (const role of [...state.roles].sort((a, b) => b.position - a.position)) {
+    const row = document.createElement('div');
+    row.className = 'srv-row';
+    const chip = document.createElement('span');
+    chip.className = 'role-chip';
+    chip.style.color = role.color;
+    chip.textContent = role.name;
+    row.appendChild(chip);
+
+    const summary = document.createElement('span');
+    summary.className = 'mono small';
+    summary.textContent = (role.permissions & P.ADMINISTRATOR)
+      ? 'administrator'
+      : `${countBits(role.permissions)} perms`;
+    row.appendChild(summary);
+
+    const spacer = document.createElement('span');
+    spacer.className = 'spacer';
+    row.appendChild(spacer);
+
+    if (has(bp, P.MANAGE_ROLES)) {
+      const edit = document.createElement('button');
+      edit.className = 'srv-act';
+      edit.textContent = 'edit';
+      edit.addEventListener('click', () => openRoleModal(role));
+      row.appendChild(edit);
+
+      if (role.id !== 'everyone' && role.id !== 'admin') {
+        const del = document.createElement('button');
+        del.className = 'srv-act danger';
+        del.textContent = 'delete';
+        del.addEventListener('click', () => {
+          if (confirm(`Delete the ${role.name} role?`)) {
+            rtc.request('role:delete', { id: role.id }).catch((err) => alert(err.message));
+          }
+        });
+        row.appendChild(del);
+      }
+    }
+    rolesBox.appendChild(row);
+  }
+}
+
+const countBits = (n) => { let c = 0; while (n) { c += n & 1; n >>>= 1; } return c; };
+
+function isServerMutedInDir(userId) {
+  for (const ch of state.directory) {
+    for (const p of ch.peers || []) {
+      if (p.userId === userId) return !!p.state?.serverMuted;
+    }
+  }
+  return false;
+}
+
+function openRoleModal(role) {
+  state.editingRole = role;
+  const isEveryone = role?.id === 'everyone';
+  $('role-title').textContent = role ? `Edit ${role.name}` : 'New role';
+  $('role-name').value = role?.name || '';
+  $('role-name').disabled = isEveryone;
+  $('role-color').value = /^#[0-9a-f]{6}$/i.test(role?.color || '') ? role.color : '#7fa3b8';
+
+  const box = $('role-perms');
+  box.textContent = '';
+  for (const [bit, label] of PERM_LABELS) {
+    if (bit === P.ADMINISTRATOR && (isEveryone || !state.me?.isOwner)) continue;
+    const lab = document.createElement('label');
+    lab.className = 'check';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.dataset.bit = bit;
+    cb.checked = !!(role && (role.permissions & bit));
+    lab.appendChild(cb);
+    lab.appendChild(document.createTextNode(' ' + label));
+    box.appendChild(lab);
+  }
+  $('btn-role-delete').classList.toggle('hidden',
+    !role || isEveryone || role.id === 'admin');
+  $('modal-role').showModal();
+}
+
+async function saveRole() {
+  let permissions = 0;
+  for (const cb of $('role-perms').querySelectorAll('input:checked')) {
+    permissions |= Number(cb.dataset.bit);
+  }
+  const payload = {
+    name: $('role-name').value.trim(),
+    color: $('role-color').value,
+    permissions
+  };
+  try {
+    if (state.editingRole) {
+      await rtc.request('role:update', { id: state.editingRole.id, ...payload });
+    } else {
+      await rtc.request('role:create', payload);
+    }
+    $('modal-role').close();
+  } catch (err) { alert(err.message); }
+}
+
+async function claimOwner() {
+  const code = $('owner-code').value.trim();
+  const status = $('owner-status');
+  try {
+    await rtc.request('owner:claim', { code });
+    status.textContent = 'you are the owner now';
+    state.ownerClaimed = true;
+    if (state.me) state.me.isOwner = true;
+    renderServerPanel();
+    const list = await rtc.request('channels:list').catch(() => null);
+    if (Array.isArray(list)) applyDirectory(list);
+  } catch (err) {
+    status.textContent = err.message;
+  }
+}
 
 /* ─────────────────────────── stats overlay ──────────────────────────── */
 
@@ -648,6 +1261,7 @@ function openSettings() {
   fillSettingsForm();
   refreshDeviceLists();
   refreshCrewTable();
+  renderServerPanel();
   $('modal-settings').showModal();
 }
 
@@ -900,11 +1514,10 @@ const escapeHtml = (s) =>
 /* ───────────────────────── reconnect handling ───────────────────────── */
 
 let banner = null;
-let lastChannel = null;
 
 rtc.on('disconnected', () => {
   if (!state.connected) return;
-  lastChannel = state.channelId;
+  state.pendingAfterHello = { voice: state.channelId, view: state.viewId };
   if (!banner) {
     banner = document.createElement('div');
     banner.className = 'banner';
@@ -913,16 +1526,14 @@ rtc.on('disconnected', () => {
   }
 });
 
-rtc.on('reconnected', async () => {
+rtc.on('reconnected', () => {
   banner?.remove(); banner = null;
-  // Server-side peer state is gone; rebuild from scratch.
-  const rejoin = lastChannel;
+  // Server-side peer state is gone; rebuild from scratch. A fresh 'hello'
+  // arrives on the new connection and applyHello() handles the rejoin.
   state.channelId = null;
+  state.peers.clear();
   for (const el of document.querySelectorAll('#tile-grid .tile')) el.remove();
   $('audio-sink').textContent = '';
-  const dir = await rtc.channels().catch(() => []);
-  onDirectory(dir);
-  if (rejoin) await joinChannel(rejoin).catch(console.error);
 });
 
 /* ────────────────────────────── wiring ──────────────────────────────── */
@@ -933,11 +1544,6 @@ function wire() {
   $('in-server').value = settings.serverUrl;
   $('in-name').value = settings.displayName;
 
-  $('channel-list').addEventListener('click', (e) => {
-    const ch = e.target.closest('.channel');
-    if (ch) joinChannel(ch.dataset.id).catch((err) => updateEmptyStage(err.message));
-  });
-
   $('btn-mute').addEventListener('click', () => setMuted(!state.muted));
   $('btn-rail-mute').addEventListener('click', () => setMuted(!state.muted));
   $('btn-deafen').addEventListener('click', () => setDeafened(!state.deafened));
@@ -947,6 +1553,33 @@ function wire() {
   $('btn-leave').addEventListener('click', () => leaveChannel().catch(console.error));
   $('btn-settings').addEventListener('click', openSettings);
   $('btn-rail-settings').addEventListener('click', openSettings);
+
+  // channel management
+  $('btn-add-text').addEventListener('click', () => openCreateChannel('text'));
+  $('btn-add-voice').addEventListener('click', () => openCreateChannel('voice'));
+  $('btn-chan-cancel').addEventListener('click', () => $('modal-channel').close());
+  $('btn-chan-create').addEventListener('click', () => createChannel());
+  $('chan-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') createChannel(); });
+  $('chat-edit-btn').addEventListener('click', () => {
+    const ch = state.dirMap.get(chat.current());
+    if (ch) openChannelEdit(ch);
+  });
+  $('btn-chanedit-close').addEventListener('click', () => $('modal-channel-edit').close());
+  $('btn-chanedit-save').addEventListener('click', () => saveChannelEdit());
+
+  // roles & owner
+  $('btn-add-role').addEventListener('click', () => openRoleModal(null));
+  $('btn-role-cancel').addEventListener('click', () => $('modal-role').close());
+  $('btn-role-save').addEventListener('click', () => saveRole());
+  $('btn-role-delete').addEventListener('click', () => {
+    const role = state.editingRole;
+    if (role && confirm(`Delete the ${role.name} role?`)) {
+      rtc.request('role:delete', { id: role.id })
+        .then(() => $('modal-role').close())
+        .catch((err) => alert(err.message));
+    }
+  });
+  $('btn-claim-owner').addEventListener('click', () => claimOwner());
 
   // share modal
   $('btn-share-cancel').addEventListener('click', () => $('modal-share').close());

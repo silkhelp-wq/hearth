@@ -3,3 +3,6 @@ dist/
 release/
 *.log
 .DS_Store
+
+# chat database and runtime state
+server/data/

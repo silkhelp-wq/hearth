@@ -115,3 +115,85 @@ audio capture, host-side admin (kick/rename channels live), Opus bitrate
 slider, TURN-less operation is inherent (no TURN needed — the tailnet is
 the transport). Single worker by design; shard routers across workers with
 per-worker `WebRtcServer` ports if the crew ever outgrows it.
+
+---
+
+## v0.2 — identity, permissions, and text chat
+
+### Identity: device tokens, no passwords
+
+Each install generates a random token once (`localStorage`) and presents it in
+the socket.io auth handshake. The server stores only the SHA-256 of the token;
+an unknown hash creates a new user, a known one logs the same person back in.
+There is nothing to phish and nothing to reset — lose the token, you're simply
+a new person (an Admin can re-role you).
+
+**Owner claim:** first boot writes a random claim code into the database and
+prints it in the server console until someone enters it under
+Settings → Server. The owner bypasses all permission checks and is immune to
+mute/kick.
+
+### Permission model
+
+Bitfield permissions, resolved with the same algorithm Discord documents:
+
+```
+base   = OR(@everyone, …user's roles)          ADMINISTRATOR or owner ⇒ all
+channel = base
+        → apply @everyone overwrite   (deny stripped, then allow added)
+        → apply role overwrites       (ORed denies stripped, ORed allows added)
+        → apply member overwrite      (deny stripped, then allow added)
+```
+
+One deliberate deviation: `CREATE_CHANNELS` is split out of
+`MANAGE_CHANNELS` (Discord bundles them), so the shipped default —
+`@everyone` = view/send/embed/create/connect/speak, `Admin` = administrator —
+expresses *"everyone creates channels, Admins delete them."*
+
+### Storage (SQLite via better-sqlite3, WAL)
+
+```
+users(id, name, token_hash, is_owner)        roles(id, name, color, position, permissions)
+user_roles(user_id, role_id)                 channels(id, name, type, topic, position)
+overwrites(channel_id, target_type, target_id, allow, deny)
+messages(id ↑, channel_id, author_id, content, reply_to, created_at, edited_at)
+reactions(message_id, user_id, emoji)        pins(message_id, channel_id, …)
+message_links(message_id, url)               link_previews(url, ok, title, description, site_name)
+read_state(user_id, channel_id, last_read_id)
+messages_fts — FTS5 external-content index, kept in sync by triggers
+```
+
+**Rolling prune:** every 30 minutes (and at boot) the server checkpoints the
+WAL, stats the file, and — if it exceeds `HEARTH_CHAT_CAP_MB` — deletes the
+oldest messages in batches of 500 (pins included, by design) until back under
+the cap, then reclaims pages with `incremental_vacuum`.
+
+### Chat fan-out
+
+Every authenticated socket is joined to a `text:<channelId>` room for each
+text channel it can `VIEW_CHANNEL`; message/typing/reaction/pin events
+broadcast to those rooms, so a deny overwrite genuinely hides traffic, not
+just UI. Membership is re-synced whenever channels, roles, or overwrites
+change. *Known edge:* a permission change re-evaluates room membership
+immediately, but a client whose currently-open view was revoked only fully
+refreshes on the next directory update it acts on.
+
+**Directory model:** any channel/role/occupancy change broadcasts a
+payload-free `dir:dirty`; each client re-requests `channels:list`, which is
+computed per-user (hidden channels filtered, effective `myPerms` attached).
+
+### Link previews (text-only)
+
+On send, up to 3 URLs are extracted (only if the author has `EMBED_LINKS`).
+Uncached URLs are fetched server-side — 5 s timeout, 512 KB read cap,
+`text/html` only, private-range/localhost targets refused — parsed for
+title/og tags, cached 7 days, and pushed to the channel as a ~1 KB card.
+No images are stored or proxied, ever.
+
+### Voice changes
+
+Routers are now created lazily per voice channel (channels are dynamic).
+`room:join` gates on `VIEW_CHANNEL + CONNECT`; producing a mic track gates on
+`SPEAK` and not being moderator-muted. Moderator mute closes the live mic
+producer server-side and survives until toggled off (state is in-memory —
+a server restart clears it).

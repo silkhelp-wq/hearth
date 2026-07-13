@@ -7,6 +7,10 @@ packaged installers built with electron-builder.
 
 Prereq: Node.js 22+.
 
+> **npm 11+ note:** if `npm install` warns about blocked install scripts,
+> approve Electron's once and rebuild:
+> `npm install-scripts approve electron` then `npm rebuild electron`.
+
 ```bash
 cd client
 npm install

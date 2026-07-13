@@ -15,7 +15,7 @@
       <div class="brand">
         <span class="brand-ember" aria-hidden="true"></span>
         <h1>Hearth</h1>
-        <p class="tagline">your crew's own hall — voice · camera · screens</p>
+        <p class="tagline">your crew's own hall — voice · camera · screens · chat</p>
       </div>
 
       <label class="field">
@@ -44,8 +44,17 @@
         <div class="rail-addr mono" id="server-addr"></div>
       </header>
 
-      <div class="rail-label mono">voice halls</div>
-      <nav id="channel-list" class="channel-list"></nav>
+      <div class="rail-scroll">
+        <div class="rail-label mono">text channels
+          <button id="btn-add-text" class="rail-add hidden" title="Create text channel">+</button>
+        </div>
+        <nav id="text-list" class="channel-list"></nav>
+
+        <div class="rail-label mono">voice halls
+          <button id="btn-add-voice" class="rail-add hidden" title="Create voice channel">+</button>
+        </div>
+        <nav id="channel-list" class="channel-list"></nav>
+      </div>
 
       <footer class="self-card">
         <div class="self-ident">
@@ -61,7 +70,7 @@
     </aside>
 
     <main id="stage">
-      <header class="stage-head">
+      <header class="stage-head" id="stage-head">
         <h2 id="stage-title">Pick a hall</h2>
         <div class="stage-tools">
           <label class="check small"><input type="checkbox" id="chk-stats" /> stats</label>
@@ -72,6 +81,33 @@
 
       <div id="empty-stage" class="empty-stage">
         <p id="empty-line">Join a hall on the left to start talking.</p>
+      </div>
+
+      <!-- ─────────── Chat view ─────────── -->
+      <div id="chat-view" class="chat-view hidden">
+        <header class="chat-head">
+          <h3 id="chat-name"></h3>
+          <span id="chat-topic" class="chat-topic"></span>
+          <div class="chat-tools">
+            <input id="chat-search" class="chat-searchbox" type="text"
+                   placeholder="search this channel" spellcheck="false" />
+            <button id="chat-pins-btn" class="icon-btn" title="Pinned messages">📌</button>
+            <button id="chat-edit-btn" class="icon-btn hidden" title="Channel settings">⚙</button>
+          </div>
+        </header>
+        <div id="chat-overlay" class="chat-overlay hidden"></div>
+        <div id="chat-scroll" class="chat-scroll">
+          <div id="chat-log" class="chat-log"></div>
+        </div>
+        <button id="jump-latest" class="jump-latest hidden">↓ back to latest</button>
+        <div id="typing-line" class="typing-line"></div>
+        <div id="reply-bar" class="reply-bar hidden">
+          ↰ replying to <b id="reply-who"></b>
+          <button id="reply-cancel" class="icon-btn" title="Cancel">✕</button>
+        </div>
+        <div class="chat-input-row">
+          <textarea id="chat-input" rows="1" placeholder="Message"></textarea>
+        </div>
       </div>
 
       <div id="controls" class="controls hidden">
@@ -86,6 +122,57 @@
 
     <div id="audio-sink" aria-hidden="true"></div>
   </section>
+
+  <div id="emoji-pop" class="emoji-pop hidden"></div>
+
+  <!-- ═══════════════ Create channel ═══════════════ -->
+  <dialog id="modal-channel" class="modal">
+    <h3>New channel</h3>
+    <label class="field"><span>Name</span>
+      <input id="chan-name" type="text" maxlength="40" spellcheck="false" /></label>
+    <div class="field"><span>Type</span>
+      <label class="check"><input type="radio" name="chantype" value="text" checked /> # text</label>
+      <label class="check"><input type="radio" name="chantype" value="voice" /> 🔊 voice</label>
+    </div>
+    <div class="modal-actions">
+      <button id="btn-chan-cancel" class="btn">Cancel</button>
+      <button id="btn-chan-create" class="btn primary">Create</button>
+    </div>
+  </dialog>
+
+  <!-- ═══════════════ Channel settings ═══════════════ -->
+  <dialog id="modal-channel-edit" class="modal wide-modal">
+    <h3 id="chanedit-title">Channel settings</h3>
+    <div class="grid-2">
+      <label class="field"><span>Name</span>
+        <input id="chanedit-name" type="text" maxlength="40" spellcheck="false" /></label>
+      <label class="field"><span>Topic</span>
+        <input id="chanedit-topic" type="text" maxlength="200" spellcheck="false" /></label>
+    </div>
+    <div class="rail-label mono">access — inherit · allow · deny</div>
+    <div id="access-grid" class="access-grid"></div>
+    <div class="modal-actions">
+      <button id="btn-chanedit-close" class="btn">Close</button>
+      <button id="btn-chanedit-save" class="btn primary">Save</button>
+    </div>
+  </dialog>
+
+  <!-- ═══════════════ Role editor ═══════════════ -->
+  <dialog id="modal-role" class="modal">
+    <h3 id="role-title">Role</h3>
+    <div class="grid-2">
+      <label class="field"><span>Name</span>
+        <input id="role-name" type="text" maxlength="32" spellcheck="false" /></label>
+      <label class="field"><span>Color</span>
+        <input id="role-color" type="color" value="#7fa3b8" /></label>
+    </div>
+    <div id="role-perms" class="role-perms"></div>
+    <div class="modal-actions">
+      <button id="btn-role-delete" class="btn hidden">Delete role</button>
+      <button id="btn-role-cancel" class="btn">Cancel</button>
+      <button id="btn-role-save" class="btn primary">Save</button>
+    </div>
+  </dialog>
 
   <!-- ═══════════════ Share picker ═══════════════ -->
   <dialog id="modal-share" class="modal">
@@ -127,6 +214,7 @@
         <button class="tab" data-tab="video">Video</button>
         <button class="tab" data-tab="stream">Streaming</button>
         <button class="tab" data-tab="network">Network &amp; advice</button>
+        <button class="tab" data-tab="server">Server</button>
       </nav>
       <button id="btn-settings-close" class="icon-btn" title="Close">✕</button>
     </header>
@@ -215,6 +303,30 @@
       <div class="crew">
         <div class="rail-label mono">crew speed reports</div>
         <table class="crew-table mono small" id="crew-table"></table>
+      </div>
+    </section>
+
+    <!-- Server -->
+    <section class="tab-panel hidden" data-panel="server">
+      <div id="srv-owner-row" class="owner-row hidden">
+        <span class="field-label">claim ownership</span>
+        <div class="net-row">
+          <input id="owner-code" type="text" placeholder="code from the server console" spellcheck="false" />
+          <button id="btn-claim-owner" class="btn small primary">Claim</button>
+          <span id="owner-status" class="hint"></span>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div>
+          <div class="rail-label mono">members</div>
+          <div id="srv-members" class="srv-list"></div>
+        </div>
+        <div>
+          <div class="rail-label mono">roles
+            <button id="btn-add-role" class="rail-add hidden" title="Create role">+</button>
+          </div>
+          <div id="srv-roles" class="srv-list"></div>
+        </div>
       </div>
     </section>
   </dialog>

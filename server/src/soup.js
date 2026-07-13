@@ -1,12 +1,8 @@
 'use strict';
 /**
  * mediasoup plumbing: one worker, one WebRtcServer (single media port),
- * and one router per voice channel.
- *
- * Sizing note: a single worker (one CPU core) comfortably forwards the
- * traffic of a 10-person hangout with a couple of concurrent streams.
- * If you ever outgrow it, shard channels across additional workers —
- * each worker needs its own WebRtcServer port.
+ * and routers created lazily per voice channel — channels are dynamic
+ * now, so routers come and go with them.
  */
 
 const mediasoup = require('mediasoup');
@@ -18,31 +14,29 @@ const routers = new Map(); // channelId -> Router
 
 async function init() {
   worker = await mediasoup.createWorker(config.mediasoup.worker);
-
   worker.on('died', (err) => {
     console.error('[soup] mediasoup worker died, exiting in 2s:', err);
     setTimeout(() => process.exit(1), 2000);
   });
-
   webRtcServer = await worker.createWebRtcServer(config.mediasoup.webRtcServer);
+  return { worker, webRtcServer };
+}
 
-  for (const [index, name] of config.channels.entries()) {
-    const id = `ch-${index}`;
-    const router = await worker.createRouter({
-      mediaCodecs: config.mediasoup.router.mediaCodecs
-    });
-    routers.set(id, { id, name, router });
+async function getOrCreateRouter(channelId) {
+  if (routers.has(channelId)) return routers.get(channelId);
+  const router = await worker.createRouter({
+    mediaCodecs: config.mediasoup.router.mediaCodecs
+  });
+  routers.set(channelId, router);
+  return router;
+}
+
+function closeRouter(channelId) {
+  const router = routers.get(channelId);
+  if (router) {
+    routers.delete(channelId);
+    try { router.close(); } catch { /* already closed */ }
   }
-
-  return { worker, webRtcServer, routers };
-}
-
-function getRouterEntry(channelId) {
-  return routers.get(channelId) || null;
-}
-
-function listChannels() {
-  return [...routers.values()].map(({ id, name }) => ({ id, name }));
 }
 
 async function createTransport(router) {
@@ -54,13 +48,11 @@ async function createTransport(router) {
     initialAvailableOutgoingBitrate:
       config.mediasoup.webRtcTransport.initialAvailableOutgoingBitrate
   });
-
   const { maxIncomingBitrate } = config.mediasoup.webRtcTransport;
   if (maxIncomingBitrate) {
     try { await transport.setMaxIncomingBitrate(maxIncomingBitrate); } catch { /* non-fatal */ }
   }
-
   return transport;
 }
 
-module.exports = { init, getRouterEntry, listChannels, createTransport };
+module.exports = { init, getOrCreateRouter, closeRouter, createTransport };

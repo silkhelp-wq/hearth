@@ -33,10 +33,11 @@ export class HearthRTC extends Emitter {
 
   // ------------------------------------------------------------ connection
 
-  connect(baseUrl) {
+  connect(baseUrl, auth = {}) {
     this.baseUrl = baseUrl.replace(/\/+$/, '');
     return new Promise((resolve, reject) => {
       const socket = io(this.baseUrl, {
+        auth,
         transports: ['websocket'],
         reconnectionDelayMax: 5000,
         timeout: 8000
@@ -67,6 +68,9 @@ export class HearthRTC extends Emitter {
     });
   }
 
+  /** Subscribe to a raw server event (call after connect()). */
+  onRaw(event, cb) { this.socket.on(event, cb); }
+
   request(event, data) {
     return new Promise((resolve, reject) => {
       if (!this.socket?.connected) return reject(new Error('not connected'));
@@ -81,9 +85,9 @@ export class HearthRTC extends Emitter {
 
   // ------------------------------------------------------------------ join
 
-  async join(channelId, name) {
-    const { routerRtpCapabilities, peers } =
-      await this.request('room:join', { channelId, name });
+  async join(channelId) {
+    const { routerRtpCapabilities, peers, canSpeak } =
+      await this.request('room:join', { channelId });
 
     this.device = new Device();
     await this.device.load({ routerRtpCapabilities });
@@ -103,7 +107,7 @@ export class HearthRTC extends Emitter {
         }).catch((e) => console.error('[rtc] consume:', e));
       }
     }
-    return { peers };
+    return { peers, canSpeak };
   }
 
   async leave() {
