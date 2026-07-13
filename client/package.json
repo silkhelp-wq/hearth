@@ -1,9 +1,10 @@
 {
   "name": "hearth",
   "productName": "Hearth",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Self-hosted voice, camera, and screen-share hangout for your crew",
   "license": "MIT",
+  "author": "Mages of the Beaches LLC <silkhelp-wq@users.noreply.github.com>",
   "private": true,
   "main": "electron/main.js",
   "engines": { "node": ">=22" },
@@ -29,6 +30,7 @@
   },
   "build": {
     "appId": "io.magesofthebeaches.hearth",
+    "npmRebuild": false,
     "productName": "Hearth",
     "directories": { "output": "release" },
     "files": ["electron/**/*", "dist/**/*", "package.json"],
