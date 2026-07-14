@@ -1,6 +1,6 @@
 {
   "name": "hearth-server",
-  "version": "0.6.2",
+  "version": "0.6.4",
   "description": "Self-hosted SFU voice/video server for Hearth (signaling + mediasoup + speed test)",
   "license": "MIT",
   "private": true,

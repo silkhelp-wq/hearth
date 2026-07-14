@@ -33,6 +33,11 @@ jobs:
           cache: npm
           cache-dependency-path: client/package-lock.json
       - run: npm ci
+      - name: Bundle the auto-update token (repo secret, read-only)
+        shell: bash
+        run: |
+          mkdir -p build
+          printf '%s' "${{ secrets.HEARTH_UPDATE_TOKEN }}" > build/update-token.txt
       - run: npm run dist -- --publish never
       - name: Attach installers to the release
         uses: softprops/action-gh-release@v2

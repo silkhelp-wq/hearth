@@ -413,6 +413,37 @@ async function main() {
       return selfupdate.checkForUpdate();
     }));
 
+    socket.on('owner:transfer', guarded(async ({ userId }) => {
+      if (!db.getUser(user.id)?.is_owner) {
+        throw new Error('only the current owner can transfer ownership');
+      }
+      if (userId === user.id) throw new Error('you are already the owner');
+      const target = db.getUser(userId);
+      if (!target) throw new Error('unknown user');
+      db.transferOwner(userId);
+      console.log(`[owner] ${user.name} transferred ownership to ${target.name}`);
+      io.emit('users:update', usersWithOnline());
+      return { ok: true };
+    }));
+
+    socket.on('member:remove', guarded(async ({ userId }) => {
+      needAdmin();
+      const target = db.getUser(userId);
+      if (!target) throw new Error('unknown user');
+      if (target.is_owner) throw new Error('the owner cannot be removed');
+      if (userId === user.id) throw new Error('you cannot remove yourself');
+      for (const s of io.sockets.sockets.values()) {
+        if (s.data.user?.id === userId) {
+          s.emit('kicked', { by: user.name });
+          s.disconnect(true);
+        }
+      }
+      db.deleteUser(userId);
+      console.log(`[members] ${user.name} removed ${target.name} (${userId})`);
+      io.emit('users:update', usersWithOnline());
+      return { ok: true };
+    }));
+
     socket.on('disconnect', () => {
       const set = online.get(user.id);
       set?.delete(socket.id);
@@ -547,6 +578,13 @@ async function selftest() {
     const rx = db.toggleReaction(msg2.id, u.id, `ce:${em.id}`, true);
     assert(rx.some((r) => r.emoji === `ce:${em.id}`), 'custom-emoji reaction stored');
     assert(db.deleteEmoji(em.id), 'emoji delete');
+
+    const ghost = db.createUser('selftest-ghost-token', 'Ghost');
+    assert(db.deleteUser(ghost.id), 'member removal');
+    assert(!db.getUser(ghost.id), 'removed member gone');
+    let ownerThrew = false;
+    try { db.deleteUser(u.id); } catch { ownerThrew = true; }
+    assert(u.isOwner ? ownerThrew : true, 'owner removal blocked');
 
     const st1 = db.setStorageSettings({ chatCapMB: 2048, emojiCapMB: 1, previewCapMB: 5 }, config.storage);
     assert(st1.chatCapMB === 2048 && st1.emojiCapMB === 4, 'settings persist + clamp to floor');

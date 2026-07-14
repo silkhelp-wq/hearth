@@ -561,6 +561,34 @@ function savePreview(url, card) {
          card?.siteName ?? null, now());
 }
 
+/** Move ownership to another member (single-owner invariant). */
+function transferOwner(toId) {
+  const target = getUser(toId);
+  if (!target) throw new Error('unknown user');
+  const tx = db.transaction(() => {
+    db.prepare('UPDATE users SET is_owner = 0 WHERE is_owner = 1').run();
+    db.prepare('UPDATE users SET is_owner = 1 WHERE id = ?').run(toId);
+  });
+  tx();
+  return getUser(toId);
+}
+
+/** Permanently remove a member. Messages stay (author renders as a ghost);
+ *  the owner can never be removed. */
+function deleteUser(id) {
+  const u = getUser(id);
+  if (!u) return false;
+  if (u.is_owner) throw new Error('the owner cannot be removed');
+  const tx = db.transaction(() => {
+    db.prepare('DELETE FROM user_roles WHERE user_id = ?').run(id);
+    db.prepare('DELETE FROM reactions WHERE user_id = ?').run(id);
+    db.prepare('DELETE FROM read_state WHERE user_id = ?').run(id);
+    db.prepare('DELETE FROM users WHERE id = ?').run(id);
+  });
+  tx();
+  return true;
+}
+
 /* ────────────────────────────── emojis ─────────────────────────────── */
 
 const EMOJI_NAME_RE = /^[a-z0-9_]{2,32}$/;
@@ -692,6 +720,7 @@ module.exports = {
   history, lastMessageIds, hydrateMessages,
   toggleReaction, setPin, listPins, markRead, readState,
   search, getPreview, savePreview,
+  deleteUser, transferOwner,
   listEmojis, emojiByName, emojiById, addEmoji, deleteEmoji, emojiTotalBytes,
   getStorageSettings, setStorageSettings, previewCacheBytes, prunePreviews,
   dbSizeBytes, pruneToCap

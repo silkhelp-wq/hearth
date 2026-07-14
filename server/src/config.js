@@ -105,7 +105,7 @@ module.exports = {
       ]
     },
     webRtcTransport: {
-      initialAvailableOutgoingBitrate: 1_000_000,
+      initialAvailableOutgoingBitrate: 10_000_000,
       maxIncomingBitrate: 30_000_000
     }
   }

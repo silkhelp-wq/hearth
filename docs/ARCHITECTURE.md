@@ -295,3 +295,34 @@ dialog shows no in-app source grid there (just quality/codec/audio), and
 "Go live" fires a single `getDisplayMedia`, whose one portal prompt is the
 picker. X11/Windows/macOS keep the in-app source list — their getSources()
 doesn't prompt. Wayland is detected via WAYLAND_DISPLAY / XDG_SESSION_TYPE.
+
+### Stream lag fix + focus mode (v0.6.3)
+
+**The v0.5 L1T3 change made screen streams SVC**, so mediasoup's bandwidth
+estimator chooses the forwarded temporal layer — and with a 1 Mbps initial
+estimate it sat on T0 (quarter framerate: the "choppy/laggy" regression).
+Fix: consumers now request the top temporal layer on creation
+(`setPreferredLayers`, still congestion-degradable) and
+`initialAvailableOutgoingBitrate` starts at 10 Mbps.
+
+**Focus mode:** single-click a tile to watch one stream — it fills the stage,
+other video tiles shrink to a strip and their consumers are **server-paused**
+(zero packets, real bandwidth/decode savings) with a "paused" overlay; click
+another to switch (resume + keyframe), click the focused tile to unfocus and
+resume all. Double-click still pops out the theater. Audio never pauses.
+
+**CI auto-update token:** the release workflow now writes
+`client/build/update-token.txt` from the `HEARTH_UPDATE_TOKEN` repo secret,
+so CI-built installers can actually check the private repo for updates
+(previously only source-built clients could).
+
+### Identity profile pin + member removal (v0.6.4)
+
+Unpackaged Electron (`npm start`) and packaged builds default to different
+userData dirs (package `name` vs `productName`), so the localStorage device
+token — and therefore the member identity and any owner claim — silently
+split between them. `main.js` now pins userData to one path ('Hearth') for
+every launch mode. Administrators also get **member removal** (`member:remove`):
+boots live sockets, deletes the user row + role/reaction/read-state
+references, keeps their messages (ghost author), and can never target the
+owner or yourself — the cleanup tool for duplicate identities.

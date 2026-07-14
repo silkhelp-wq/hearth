@@ -129,3 +129,10 @@ extract for any failure. File issues with TC ID in the title.
 | TC-47 | Service install | Run install-server.sh, reboot | Server auto-starts with no terminal; data survives; --uninstall keeps a data backup |
 | TC-48 | Native package | makepkg -si on CachyOS, enable the user service | Installs to /opt, runs as service, data in ~/.local/share/hearth |
 | TC-49 | Auto-update | With a token set, publish a newer release, open Settings | App shows update available; Update now downloads+installs+restarts; reinstall leaves no stale files |
+
+| TC-50 | Smooth streams | Two 60fps streams, watch as a third | Full framerate within ~2s of joining; no quarter-rate choppiness |
+| TC-51 | Focus mode | Click one of two streams | It fills the stage; other shows "paused" and stops consuming; click other to switch; click focused to restore grid |
+| TC-52 | CI auto-update | Set HEARTH_UPDATE_TOKEN secret, release, run older installed build | Settings shows "update available"; Update now installs and restarts |
+
+| TC-53 | One identity | Run via npm start AND the installed build | Same member both ways; no duplicate user; owner claim holds |
+| TC-54 | Member removal | Admin removes a duplicate member | They vanish from the roster, live sessions boot, messages remain; owner and self are refused |

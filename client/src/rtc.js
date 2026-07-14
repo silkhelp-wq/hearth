@@ -301,6 +301,17 @@ export class HearthRTC extends Emitter {
     return this.request('consumer:keyframe', { consumerId }).catch(() => {});
   }
 
+  /** Server-side pause/resume: pausing stops packets entirely (real
+   *  bandwidth savings), resume also asks for a fresh keyframe. */
+  pauseConsumer(consumerId) {
+    return this.request('consumer:pause', { consumerId }).catch(() => {});
+  }
+
+  async resumeConsumer(consumerId) {
+    await this.request('consumer:resume', { consumerId }).catch(() => {});
+    this.requestKeyframe(consumerId);
+  }
+
   #dropConsumer(consumerId) {
     const entry = this.consumers.get(consumerId);
     if (!entry) return;

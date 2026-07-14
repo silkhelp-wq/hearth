@@ -13,6 +13,12 @@ const { app, BrowserWindow, ipcMain, session, desktopCapturer } = require('elect
 const path = require('path');
 const updater = require('./updater');
 
+// One profile no matter how Hearth is launched. Unpackaged (`npm start`)
+// defaults userData to the package *name* (~/.config/hearth) while packaged
+// builds use productName (~/.config/Hearth) — two profiles, two device
+// tokens, and suddenly you're a duplicate member who "lost" ownership.
+app.setPath('userData', path.join(app.getPath('appData'), 'Hearth'));
+
 // Wayland: route getDisplayMedia through the xdg-desktop-portal / PipeWire.
 // AcceleratedVideoEncoder: opt into VA-API hardware encode on Linux where
 // the driver offers it (Intel/AMD; NVIDIA's Linux driver has no VA-API

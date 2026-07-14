@@ -359,6 +359,15 @@ function attachSocket(io, socket) {
       .find((t) => t.appData.direction === 'recv');
     if (!transport) throw new Error('no receive transport');
     const consumer = await transport.consume({ producerId, rtpCapabilities, paused: true });
+    // L1T3 screen producers are SVC: mediasoup picks the forwarded temporal
+    // layer from its bandwidth estimate, which starts low and can sit at
+    // T0 (quarter framerate = "choppy"). Ask for the top layer up front;
+    // mediasoup still degrades under real congestion.
+    if (consumer.kind === 'video' &&
+        (consumer.type === 'svc' || consumer.type === 'simulcast')) {
+      consumer.setPreferredLayers({ spatialLayer: 0, temporalLayer: 2 })
+        .catch(() => {});
+    }
     peer.consumers.set(consumer.id, consumer);
     consumer.on('transportclose', () => peer.consumers.delete(consumer.id));
     consumer.on('producerclose', () => {
@@ -369,6 +378,13 @@ function attachSocket(io, socket) {
       consumerId: consumer.id, producerId,
       kind: consumer.kind, rtpParameters: consumer.rtpParameters
     };
+  }));
+
+  socket.on('consumer:pause', guarded(async ({ consumerId }) => {
+    const consumer = currentPeer()?.consumers.get(consumerId);
+    if (!consumer) throw new Error('unknown consumer');
+    await consumer.pause();
+    return { ok: true };
   }));
 
   socket.on('consumer:keyframe', guarded(async ({ consumerId }) => {

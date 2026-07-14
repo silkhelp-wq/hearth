@@ -857,6 +857,40 @@ const tileKey = (peerId, tag) => `${peerId}:${tag}`;
 
 const theater = { key: null, drag: null, resize: null };
 
+/* ─────────────── focus mode: watch one stream at a time ─────────────── */
+
+let focusKey = null;
+
+function videoConsumersByTile() {
+  const map = new Map(); // tileKey -> consumerId
+  for (const [id, entry] of rtc.consumers) {
+    if (entry.mediaTag === 'cam' || entry.mediaTag === 'screen') {
+      map.set(tileKey(entry.peerId, entry.mediaTag), id);
+    }
+  }
+  return map;
+}
+
+async function setFocus(key) {
+  focusKey = (focusKey === key) ? null : key;
+  const grid = $('tile-grid');
+  grid.classList.toggle('focus-mode', Boolean(focusKey));
+  const byTile = videoConsumersByTile();
+  for (const tile of grid.querySelectorAll('.tile')) {
+    const isFocused = tile.dataset.key === focusKey;
+    tile.classList.toggle('focused', isFocused);
+    const cid = byTile.get(tile.dataset.key);
+    if (!cid) { tile.classList.remove('vid-paused'); continue; } // own tiles
+    if (focusKey && !isFocused) {
+      rtc.pauseConsumer(cid);
+      tile.classList.add('vid-paused');
+    } else {
+      rtc.resumeConsumer(cid);
+      tile.classList.remove('vid-paused');
+    }
+  }
+}
+
 function openTheater(peerId, tag, label, stream) {
   const el = $('theater');
   theater.key = tileKey(peerId, tag);
@@ -960,7 +994,11 @@ function attachTile(peerId, tag, label, stream, badge = '') {
   node.querySelector('.who').textContent = label;
   node.querySelector('.badge').textContent = badge;
   node.querySelector('video').srcObject = stream;
-  node.title = 'Click to pop out';
+  node.title = 'Click to focus · double-click to pop out';
+  node.addEventListener('click', (e) => {
+    if (e.target.closest('.tile-expand')) return;
+    setFocus(tileKey(peerId, tag));
+  });
   node.addEventListener('dblclick', () => openTheater(peerId, tag, label, stream));
   const expand = document.createElement('button');
   expand.className = 'tile-expand';
@@ -978,6 +1016,7 @@ function attachTile(peerId, tag, label, stream, badge = '') {
 function removeTile(peerId, tag) {
   document.querySelector(`.tile[data-key="${CSS.escape(tileKey(peerId, tag))}"]`)?.remove();
   if (theater.key === tileKey(peerId, tag)) closeTheater();
+  if (focusKey === tileKey(peerId, tag)) setFocus(focusKey); // toggles off + resumes
   updateEmptyStage();
 }
 
@@ -1258,6 +1297,18 @@ function renderServerPanel() {
     row.appendChild(spacer);
 
     if (u.id !== state.me.id && !u.isOwner) {
+      if (state.users.get(state.me.id)?.isOwner) {
+        const crown = document.createElement('button');
+        crown.className = 'srv-act';
+        crown.textContent = '★ make owner';
+        crown.title = 'Transfer server ownership to this member';
+        crown.addEventListener('click', () => {
+          if (confirm(`Transfer ownership to ${u.name}? You will no longer be the owner.`)) {
+            rtc.request('owner:transfer', { userId: u.id }).catch((err) => alert(err.message));
+          }
+        });
+        row.appendChild(crown);
+      }
       if (has(bp, P.MUTE_MEMBERS)) {
         const curMuted = isServerMutedInDir(u.id);
         const mute = document.createElement('button');
@@ -1279,6 +1330,18 @@ function renderServerPanel() {
           }
         });
         row.appendChild(kick);
+      }
+      if (has(bp, P.ADMINISTRATOR)) {
+        const del = document.createElement('button');
+        del.className = 'srv-act danger';
+        del.textContent = 'remove';
+        del.title = 'Delete this member entirely (their messages stay)';
+        del.addEventListener('click', () => {
+          if (confirm(`Remove ${u.name} permanently? Their device becomes a brand-new member if they reconnect. Messages they wrote stay.`)) {
+            rtc.request('member:remove', { userId: u.id }).catch((err) => alert(err.message));
+          }
+        });
+        row.appendChild(del);
       }
     }
     members.appendChild(row);

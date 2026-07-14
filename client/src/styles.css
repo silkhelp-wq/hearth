@@ -1055,3 +1055,25 @@ label.rail-add { display: inline-flex; align-items: center; justify-content: cen
   background: var(--panel-2); border: 1px solid var(--seam); border-radius: 8px;
 }
 #update-status { color: var(--ash); }
+
+/* ═══════════════ focus mode (watch one stream) ═══════════════ */
+
+.tile-grid.focus-mode {
+  display: flex; flex-wrap: wrap; align-content: flex-start;
+  gap: 8px; height: 100%; min-height: 0;
+}
+.tile-grid.focus-mode .tile.focused {
+  order: -1; flex: 1 1 100%;
+  height: calc(100% - 132px); min-height: 0;
+  border-color: var(--fel-deep);
+}
+.tile-grid.focus-mode .tile:not(.focused) {
+  flex: 0 0 200px; height: 112px;
+}
+.tile.vid-paused::after {
+  content: 'paused — click to watch';
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(13, 18, 16, 0.72);
+  color: var(--ash); font-size: 11px;
+}
