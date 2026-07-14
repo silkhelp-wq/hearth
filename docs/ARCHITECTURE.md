@@ -376,3 +376,20 @@ overlay already reports the live encoder as hw:/sw: so you can verify. If it
 reads sw: on NVIDIA, the realistic mitigation is VP8 + lower res/fps to make
 software encode keep up, or accept the constraint and use Sunshine for
 game-grade streaming.
+
+### Discord-style notifications + stream PiP (v0.7.0)
+
+**Notifications:** WebAudio-synthesized sounds (no assets) for hall
+join/leave, "went live" (with toast), and "X is watching your stream" — the
+last driven by a new `stream:viewer` event the server emits to the producing
+peer on the FIRST resume of each screen consumer (focus-mode pause/resume
+reuses consumers, so no repeat spam). The @mention ping now routes through the
+same system. Settings → Notifications has per-event toggles plus a master
+switch; defaults all on, persisted in settings.
+
+**Picture-in-picture:** switching to a text channel while a stream is live
+shrinks it to a draggable mini-window over chat (`#pip`), mirroring the
+focused (else first) screen tile's MediaStream — muted, since audio already
+flows through the audio sink. Click returns to the stage focused on that
+stream; ✕ dismisses until the stream changes; it follows stream start/stop
+while you read.

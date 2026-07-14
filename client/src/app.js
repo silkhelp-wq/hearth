@@ -141,7 +141,10 @@ function onIncoming(channelId, m) {
   if (!state.me || m.authorId === state.me.id) return;
   const cur = state.unread.get(channelId) || { count: 0, mention: false };
   cur.count += 1;
-  if (mentionsMe(m.content, state.me.name)) { cur.mention = true; playPing(); }
+  if (mentionsMe(m.content, state.me.name)) {
+    cur.mention = true;
+    if (notifOn('mention')) playPing();
+  }
   state.unread.set(channelId, cur);
   renderRail();
 }
@@ -153,6 +156,67 @@ function onRead(channelId, lastId) {
 }
 
 let pingCtx = null;
+/* ─────────────────── notifications (Discord-style) ─────────────────── */
+
+const NOTIF_DEFAULTS = {
+  master: true, join: true, leave: true, live: true, viewer: true, mention: true
+};
+
+function notifSettings() {
+  settings.notifications = { ...NOTIF_DEFAULTS, ...(settings.notifications || {}) };
+  return settings.notifications;
+}
+
+function notifOn(key) {
+  const n = notifSettings();
+  return n.master && n[key];
+}
+
+/** One tiny WebAudio voice for every notification sound — no assets. */
+function playTones(spec, vol = 0.1) {
+  try {
+    pingCtx = pingCtx || new AudioContext();
+    const t = pingCtx.currentTime;
+    for (const [freq, at, dur] of spec) {
+      const osc = pingCtx.createOscillator();
+      const gain = pingCtx.createGain();
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, t + at);
+      gain.gain.exponentialRampToValueAtTime(vol, t + at + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + at + dur);
+      osc.connect(gain).connect(pingCtx.destination);
+      osc.start(t + at); osc.stop(t + at + dur + 0.02);
+    }
+  } catch { /* audio not ready */ }
+}
+
+const SOUNDS = {
+  join:   [[523, 0, 0.14], [784, 0.09, 0.16]],            // rising: someone's here
+  leave:  [[784, 0, 0.14], [523, 0.09, 0.16]],            // falling: someone left
+  live:   [[587, 0, 0.12], [740, 0.10, 0.12], [880, 0.20, 0.2]], // little fanfare
+  viewer: [[988, 0, 0.09], [988, 0.12, 0.09]]             // soft double-tap
+};
+
+function notify(key, toastText) {
+  if (!notifOn(key)) return;
+  if (SOUNDS[key]) playTones(SOUNDS[key]);
+  if (toastText) showToast(toastText);
+}
+
+/* Lightweight ember toasts, bottom-right, auto-dismiss. */
+function showToast(text) {
+  const wrap = $('toasts');
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = text;
+  wrap.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('show'));
+  setTimeout(() => {
+    el.classList.remove('show');
+    setTimeout(() => el.remove(), 300);
+  }, 4200);
+}
+
 function playPing() {
   try {
     pingCtx = pingCtx || new AudioContext();
@@ -435,6 +499,7 @@ function viewText(ch) {
   $('chat-edit-btn').classList.toggle('hidden', !has(ch.myPerms, P.MANAGE_CHANNELS));
   chat.open(ch).catch((err) => console.error('[chat]', err));
   renderRail();
+  updatePip();
 }
 
 function showStage() {
@@ -444,6 +509,84 @@ function showStage() {
   $('tile-grid').classList.remove('hidden');
   updateEmptyStage();
   renderRail();
+  updatePip();
+}
+
+/* ───────── picture-in-picture: the stream follows you into text ───────── */
+
+const pip = { key: null, dismissedKey: null };
+
+function activeStreamTile() {
+  // Prefer the focused stream, else the first live screen share on stage.
+  const focused = focusKey &&
+    document.querySelector(`.tile.focused[data-key$=":screen"]`);
+  return focused ||
+    document.querySelector('.tile[data-key$=":screen"]') || null;
+}
+
+function updatePip() {
+  const el = $('pip');
+  const inTextView = state.viewId && state.viewId !== state.channelId;
+  const tile = inTextView ? activeStreamTile() : null;
+  const video = tile?.querySelector('video');
+
+  if (!tile || !video?.srcObject) {
+    el.classList.add('hidden');
+    $('pip-video').srcObject = null;
+    pip.key = null;
+    return;
+  }
+  const key = tile.dataset.key;
+  if (pip.dismissedKey === key) { el.classList.add('hidden'); return; }
+  if (pip.dismissedKey && pip.dismissedKey !== key) pip.dismissedKey = null;
+
+  if (pip.key !== key || $('pip-video').srcObject !== video.srcObject) {
+    pip.key = key;
+    $('pip-video').srcObject = video.srcObject;
+    const peerId = key.split(':')[0];
+    $('pip-label').textContent =
+      `${state.users.get(peerId)?.name || 'stream'} · click to return`;
+  }
+  el.classList.remove('hidden');
+}
+
+function wirePip() {
+  const el = $('pip');
+  $('pip-close').addEventListener('click', (e) => {
+    e.stopPropagation();
+    pip.dismissedKey = pip.key;
+    el.classList.add('hidden');
+  });
+  el.addEventListener('click', (e) => {
+    if (e.target.closest('#pip-close') || pipDrag.moved) return;
+    if (pip.key) setFocusIfDifferent(pip.key);
+    showStage();
+  });
+  // drag by the header
+  const pipDrag = { on: false, dx: 0, dy: 0, moved: false };
+  $('pip-head').addEventListener('mousedown', (e) => {
+    if (e.target.closest('#pip-close')) return;
+    const r = el.getBoundingClientRect();
+    pipDrag.on = true; pipDrag.moved = false;
+    pipDrag.dx = e.clientX - r.left; pipDrag.dy = e.clientY - r.top;
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!pipDrag.on) return;
+    pipDrag.moved = true;
+    const x = Math.max(0, Math.min(e.clientX - pipDrag.dx, window.innerWidth - 160));
+    const y = Math.max(0, Math.min(e.clientY - pipDrag.dy, window.innerHeight - 90));
+    el.style.left = `${x}px`; el.style.top = `${y}px`;
+    el.style.right = 'auto'; el.style.bottom = 'auto';
+  });
+  window.addEventListener('mouseup', () => {
+    if (pipDrag.on) setTimeout(() => { pipDrag.moved = false; }, 0);
+    pipDrag.on = false;
+  });
+}
+
+function setFocusIfDifferent(key) {
+  if (focusKey !== key) setFocus(key); // setFocus toggles; only call when different
 }
 
 /* ─────────────────────────── join / leave ───────────────────────────── */
@@ -1024,6 +1167,7 @@ function removeTile(peerId, tag) {
   if (theater.key === tileKey(peerId, tag)) closeTheater();
   if (focusKey === tileKey(peerId, tag)) setFocus(focusKey); // toggles off + resumes
   updateEmptyStage();
+  updatePip();
 }
 
 const audioEls = (peerId) =>
@@ -1045,7 +1189,16 @@ function updateEmptyStage(message) {
   else $('empty-line').textContent = 'Voices only so far. Share your screen or turn on your camera.';
 }
 
+rtc.on('stream-viewer', ({ name }) => {
+  notify('viewer', `${name} is watching your stream`);
+});
+
 rtc.on('consumer-added', ({ consumerId, peerId, mediaTag, kind, track }) => {
+  if (mediaTag === 'screen' && kind === 'video') {
+    const who = state.users.get(peerId)?.name || 'Someone';
+    notify('live', `${who} went live`);
+    setTimeout(updatePip, 150); // tile mounts first, then PiP can mirror it
+  }
   const who = state.peers.get(peerId)?.name || 'someone';
   if (kind === 'video') {
     attachTile(peerId, mediaTag, who, new MediaStream([track]),
@@ -1071,10 +1224,12 @@ rtc.on('consumer-closed', ({ consumerId, peerId, mediaTag }) => {
 });
 
 rtc.on('peer-joined', (p) => {
+  if (p.id !== state.me.id) notify('join');
   state.peers.set(p.id, { name: p.name, userId: p.userId, state: p.state });
 });
 
 rtc.on('peer-left', ({ id }) => {
+  if (id !== state.me.id) notify('leave');
   state.peers.delete(id);
   for (const el of audioEls(id)) el.remove();
   document.querySelectorAll(`.tile[data-peer="${CSS.escape(id)}"]`).forEach((n) => n.remove());
@@ -1800,6 +1955,28 @@ async function onAudioSettingsChanged() {
   }
 }
 
+function wireNotifSettings() {
+  const n = notifSettings();
+  const map = { master: 'nf-master', join: 'nf-join', leave: 'nf-leave',
+                live: 'nf-live', viewer: 'nf-viewer', mention: 'nf-mention' };
+  for (const [key, id] of Object.entries(map)) {
+    const box = $(id);
+    box.checked = n[key];
+    box.addEventListener('change', () => {
+      notifSettings()[key] = box.checked;
+      saveSettings();
+      if (key === 'master') syncNotifEnabled();
+    });
+  }
+  syncNotifEnabled();
+}
+
+function syncNotifEnabled() {
+  const on = notifSettings().master;
+  $('nf-items').classList.toggle('nf-disabled', !on);
+  for (const box of $('nf-items').querySelectorAll('input')) box.disabled = !on;
+}
+
 async function bindPtt() {
   $('ptt-label').textContent = 'press a key or mouse button…';
   let binding = await bridge.captureNextInput();
@@ -2398,6 +2575,8 @@ function wire() {
   });
 
   wireTheater();
+  wirePip();
+  wireNotifSettings();
   statsLoop();
 }
 

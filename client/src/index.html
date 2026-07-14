@@ -144,6 +144,11 @@
     </main>
 
     <div id="audio-sink" aria-hidden="true"></div>
+    <div id="toasts" aria-live="polite"></div>
+    <div id="pip" class="hidden">
+      <div id="pip-head"><span id="pip-label"></span><button id="pip-close" title="Hide">✕</button></div>
+      <video id="pip-video" autoplay muted playsinline></video>
+    </div>
   </section>
 
   <div id="picker-pop" class="picker-pop hidden"></div>
@@ -253,6 +258,7 @@
         <button class="tab" data-tab="video">Video</button>
         <button class="tab" data-tab="stream">Streaming</button>
         <button class="tab" data-tab="network">Network &amp; advice</button>
+        <button class="tab" data-tab="notify">Notifications</button>
         <button class="tab" data-tab="server">Server</button>
       </nav>
       <button id="btn-settings-close" class="icon-btn" title="Close">✕</button>
@@ -362,6 +368,25 @@
     </section>
 
     <!-- Server -->
+    <section class="tab-panel hidden" data-panel="notify">
+      <label class="row master-row"><input type="checkbox" id="nf-master" checked>
+        <b>Enable all notifications</b></label>
+      <p class="hint">Sounds (and small pop-ups where noted) for things happening
+        in your hall — Discord-style. Untick the master switch to silence
+        everything at once, or tune events one by one.</p>
+      <div id="nf-items">
+        <label class="row"><input type="checkbox" id="nf-join" checked>
+          Someone joins your voice hall <span class="hint">(sound)</span></label>
+        <label class="row"><input type="checkbox" id="nf-leave" checked>
+          Someone leaves your voice hall <span class="hint">(sound)</span></label>
+        <label class="row"><input type="checkbox" id="nf-live" checked>
+          Someone goes live <span class="hint">(sound + pop-up)</span></label>
+        <label class="row"><input type="checkbox" id="nf-viewer" checked>
+          Someone starts watching <i>your</i> stream <span class="hint">(sound + pop-up)</span></label>
+        <label class="row"><input type="checkbox" id="nf-mention" checked>
+          You are @mentioned <span class="hint">(ping)</span></label>
+      </div>
+    </section>
     <section class="tab-panel hidden" data-panel="server">
       <div id="srv-owner-row" class="owner-row hidden">
         <span class="field-label">claim ownership</span>

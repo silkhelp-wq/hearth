@@ -56,6 +56,7 @@ export class HearthRTC extends Emitter {
       socket.on('peer:left', (p) => this.emit('peer-left', p));
       socket.on('peer:state', (p) => this.emit('peer-state', p));
       socket.on('speaker', (p) => this.emit('speaker', p));
+      socket.on('stream:viewer', (p) => this.emit('stream-viewer', p));
       socket.on('consumer:closed', ({ consumerId }) => this.#dropConsumer(consumerId));
       socket.on('producer:new', (p) => {
         if (this.joined) this.#consume(p).catch((e) => console.error('[rtc] consume:', e));

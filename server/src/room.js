@@ -358,7 +358,15 @@ function attachSocket(io, socket) {
     const transport = [...peer.transports.values()]
       .find((t) => t.appData.direction === 'recv');
     if (!transport) throw new Error('no receive transport');
-    const consumer = await transport.consume({ producerId, rtpCapabilities, paused: true });
+    const srcPeer = [...room.peers.values()].find((p) => p.producers.has(producerId));
+    const srcProducer = srcPeer?.producers.get(producerId);
+    const consumer = await transport.consume({
+      producerId, rtpCapabilities, paused: true,
+      appData: {
+        producerPeerId: srcPeer?.id || null,
+        producerMediaTag: srcProducer?.appData?.mediaTag || srcProducer?.kind || null
+      }
+    });
     // L1T3 screen producers are SVC: mediasoup picks the forwarded temporal
     // layer from its bandwidth estimate, which starts low and can sit at
     // T0 (quarter framerate = "choppy"). Ask for the top layer up front;
@@ -395,7 +403,8 @@ function attachSocket(io, socket) {
   }));
 
   socket.on('consumer:resume', guarded(async ({ consumerId }) => {
-    const consumer = currentPeer()?.consumers.get(consumerId);
+    const me = currentPeer();
+    const consumer = me?.consumers.get(consumerId);
     if (!consumer) throw new Error('unknown consumer');
     await consumer.resume();
     // Force a fresh keyframe on resume. Without this the viewer starts
@@ -404,6 +413,20 @@ function attachSocket(io, socket) {
     // (they render their own capture locally). Video only.
     if (consumer.kind === 'video') {
       try { await consumer.requestKeyFrame(); } catch { /* non-fatal */ }
+    }
+    // "X is watching your stream" — fired on the FIRST resume of a screen
+    // consumer only (focus-mode pause/resume reuses the consumer, so no
+    // repeat spam). Tells the producing peer who just tuned in.
+    if (!consumer.appData.viewerAnnounced &&
+        consumer.appData?.producerMediaTag === 'screen') {
+      consumer.appData.viewerAnnounced = true;
+      const ownerId = consumer.appData?.producerPeerId;
+      const room = currentRoom();
+      const owner = ownerId &&
+        [...(room?.peers.values() || [])].find((p) => p.id === ownerId);
+      if (owner && owner.id !== me.id) {
+        owner.socket.emit('stream:viewer', { name: me.name, peerId: me.id });
+      }
     }
     return { ok: true };
   }));

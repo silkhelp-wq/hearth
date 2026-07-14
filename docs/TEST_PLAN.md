@@ -135,3 +135,8 @@ extract for any failure. File issues with TC ID in the title.
 | TC-57 | P1 | Stream audio volume | Peer shares a loud game; right-click them | A separate "Stream audio" slider lowers only the game sound, not their voice; present even if their mic is muted |
 | TC-58 | P1 | Mute/deafen feedback | Click the mic/headphone buttons by your name | Button turns solid red + glow, icon switches to 🔇/🔴; muting actually gates the mic (was working before, just invisible on the dark theme) |
 | TC-59 | P1 | Encoder check | Enable the 'stats' toggle during a screen share; try H.264 then VP8 | Overlay shows codec + hw:/sw: encoder; identify which (if any) codec reaches a hardware encoder on this GPU; if all sw:, lower preset to VP8 720p/30 to stop lag |
+| TC-60 | P1 | Join/leave sounds | Second client joins then leaves your hall | Rising blip on join, falling on leave; nothing for your own join; toggles in Settings → Notifications silence each |
+| TC-61 | P1 | Go-live notify | Peer starts a screen share | Fanfare + "X went live" toast; off when its toggle or the master switch is off |
+| TC-62 | P1 | Viewer notify | Second client focuses/watches your stream | You get one "X is watching your stream" toast+sound; focus-switching back and forth does NOT repeat it |
+| TC-63 | P1 | Master switch | Untick "Enable all notifications" | Every sound/toast stops incl. mention ping; per-event boxes grey out; re-tick restores prior per-event choices |
+| TC-64 | P1 | Stream PiP | While a peer streams, click a text channel | Stream shrinks to a draggable mini-window over chat; click returns to the stage focused on it; ✕ hides it until the stream changes; ends when the stream stops |
