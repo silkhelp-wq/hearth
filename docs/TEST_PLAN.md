@@ -96,53 +96,42 @@ extract for any failure. File issues with TC ID in the title.
 
 | ID | Case | Steps | Expected |
 |---|---|---|---|
-| TC-21 | Owner claim | Boot fresh server; enter console code in Settings → Server | Claimer becomes owner (★); code stops printing; wrong code rejected |
-| TC-22 | Default create/delete split | As a fresh (roleless) user: create a text channel; try to delete any channel | Create succeeds; delete button absent / request refused |
-| TC-23 | Admin delete | Owner assigns Admin role; Admin deletes a channel | Channel and its messages disappear for everyone live |
-| TC-24 | View overwrite hides | Deny `view` for `@everyone` on a channel; check second client | Channel vanishes from rail; its events stop arriving; member-allow for one user brings it back for them only |
-| TC-25 | Speak gating | Deny `speak` on a voice hall for a role; member joins | Join succeeds listen-only; mic produce refused with message |
-| TC-26 | Moderator mute/kick | Admin mutes then kicks a member in voice | Target's mic drops instantly + 🔕 flag; unmute restores; kick disconnects with attribution; owner immune |
-| TC-27 | Chat E2E | Send, reply, edit, delete, pin, react from two clients | All render live on both; (edited) flag; delete removes; reply jump works |
-| TC-28 | Mentions & unread | Mention a user viewing another channel | Ping sound + ember badge count; opening channel clears; plain messages show dot only |
-| TC-29 | Search | Post a distinctive phrase; search it in-channel | Result row jumps to the message with flash highlight |
-| TC-30 | Link preview | Send a public https URL | Text-only card (site/title/description) appears within seconds; `http://192.168.…` never unfurls |
-| TC-31 | Rolling prune | Set `HEARTH_CHAT_CAP_MB=1`, spam messages, wait for prune (or reboot) | Oldest messages removed until under cap; server log line; newest retained |
-| TC-32 | Old client rejected | Connect with a v0.1 build | Clear "requires Hearth v0.2+" error on the connect screen |
-| TC-33 | Markdown safety | Send `<img onerror=…>` and a fenced code block | Renders as escaped text / code; no HTML executes |
-
-| TC-34 | Jukebox E2E | Two clients in a hall; paste a YouTube link | Both hear the same audio in sync; 🎵 Jukebox row appears; skip advances; queue lists pending tracks |
-| TC-35 | Link resolution | Paste a Spotify track link | Title resolves, YouTube match plays, now-playing shows "via spotify→youtube"; garbage input errors cleanly |
-| TC-36 | Member menu | Right-click a peer and the jukebox | Volume slider changes only local playback; mute-for-me toggles; server mute/kick present only with perms; owner shows neither |
-
-| TC-37 | GIF flow | Set a Tenor key, search, click a GIF | Posts inline for everyone; provider tabs match configured keys; no keys → GIF button absent |
-| TC-38 | Custom emoji | Upload an animated GIF as :party:, type :par → autocomplete, react with it | Animates inline and jumbo when alone; reaction chip shows the image; non-managers see no upload UI |
-| TC-39 | Emoji cap | Set emoji cap to 4 MB, upload past it | Upload refused with a clear message until cap raised or emojis deleted |
-| TC-40 | Live caps | Change chat cap as admin, save | Usage readout refreshes; prune honors new value without restart; non-admins see no Storage section |
-
-| TC-41 | Stream clarity | Watch a fast-motion share as a second user | No trailing/ghosting after the initial keyframe; sender unaffected |
-| TC-42 | Pop-out viewer | Click a stream's ⛶, drag it, resize, fit, fullscreen | Floats and moves; fit snaps inside the stage; fullscreen fills the display; closes when the share stops |
-| TC-43 | Jukebox queue | Queue 3 tracks back-to-back, let them play through | Each advances automatically; none dropped; skip mid-track advances cleanly |
-| TC-44 | Public host | Set HEARTH_ANNOUNCED_IP to a public IP, open ports, connect off-tailnet | Voice/video/screen all connect with no Tailscale |
-
-| TC-45 | Voice bitrate | Set quality to 24 kbps then 510 kbps mid-call | Audio audibly changes; no codec-collision errors; setting persists |
-| TC-46 | Server monitor | Open Settings → Server as owner | CPU/mem/disk/net update live every 2s; live counts match reality; non-admins never see it |
-| TC-47 | Service install | Run install-server.sh, reboot | Server auto-starts with no terminal; data survives; --uninstall keeps a data backup |
-| TC-48 | Native package | makepkg -si on CachyOS, enable the user service | Installs to /opt, runs as service, data in ~/.local/share/hearth |
-| TC-49 | Auto-update | With a token set, publish a newer release, open Settings | App shows update available; Update now downloads+installs+restarts; reinstall leaves no stale files |
-
-| TC-50 | Smooth streams | Two 60fps streams, watch as a third | Full framerate within ~2s of joining; no quarter-rate choppiness |
-| TC-51 | Focus mode | Click one of two streams | It fills the stage; other shows "paused" and stops consuming; click other to switch; click focused to restore grid |
-| TC-52 | CI auto-update | Set HEARTH_UPDATE_TOKEN secret, release, run older installed build | Settings shows "update available"; Update now installs and restarts |
-
-| TC-53 | One identity | Run via npm start AND the installed build | Same member both ways; no duplicate user; owner claim holds |
-| TC-54 | Member removal | Admin removes a duplicate member | They vanish from the roster, live sessions boot, messages remain; owner and self are refused |
-
-| TC-55 | Live bitrate change | In a voice call, change quality 128k→510k→48k | Audio keeps working each time; no "codec collision"/BUNDLE errors; bitrate audibly changes |
-
-| TC-56 | Owner reclaim | Run hearth-reclaim-owner on the host, enter the code in-app | Current identity becomes ★ owner; old owner row loses the crown; works regardless of prior token state |
-
-| TC-57 | Stream audio volume | Peer shares a loud game; right-click them | A separate "Stream audio" slider lowers only the game sound, not their voice; present even if their mic is muted |
-
-| TC-58 | Mute/deafen feedback | Click the mic/headphone buttons by your name | Button turns solid red + glow, icon switches to 🔇/🔴; muting actually gates the mic (was working before, just invisible on the dark theme) |
-
-| TC-59 | Encoder check | Enable the 'stats' toggle during a screen share; try H.264 then VP8 | Overlay shows codec + hw:/sw: encoder; identify which (if any) codec reaches a hardware encoder on this GPU; if all sw:, lower preset to VP8 720p/30 to stop lag |
+| TC-21 | P1 | Owner claim | Boot fresh server; enter console code in Settings → Server | Claimer becomes owner (★); code stops printing; wrong code rejected |
+| TC-22 | P1 | Default create/delete split | As a fresh (roleless) user: create a text channel; try to delete any channel | Create succeeds; delete button absent / request refused |
+| TC-23 | P1 | Admin delete | Owner assigns Admin role; Admin deletes a channel | Channel and its messages disappear for everyone live |
+| TC-24 | P1 | View overwrite hides | Deny `view` for `@everyone` on a channel; check second client | Channel vanishes from rail; its events stop arriving; member-allow for one user brings it back for them only |
+| TC-25 | P1 | Speak gating | Deny `speak` on a voice hall for a role; member joins | Join succeeds listen-only; mic produce refused with message |
+| TC-26 | P1 | Moderator mute/kick | Admin mutes then kicks a member in voice | Target's mic drops instantly + 🔕 flag; unmute restores; kick disconnects with attribution; owner immune |
+| TC-27 | P1 | Chat E2E | Send, reply, edit, delete, pin, react from two clients | All render live on both; (edited) flag; delete removes; reply jump works |
+| TC-28 | P1 | Mentions & unread | Mention a user viewing another channel | Ping sound + ember badge count; opening channel clears; plain messages show dot only |
+| TC-29 | P1 | Search | Post a distinctive phrase; search it in-channel | Result row jumps to the message with flash highlight |
+| TC-30 | P1 | Link preview | Send a public https URL | Text-only card (site/title/description) appears within seconds; `http://192.168.…` never unfurls |
+| TC-31 | P1 | Rolling prune | Set `HEARTH_CHAT_CAP_MB=1`, spam messages, wait for prune (or reboot) | Oldest messages removed until under cap; server log line; newest retained |
+| TC-32 | P1 | Old client rejected | Connect with a v0.1 build | Clear "requires Hearth v0.2+" error on the connect screen |
+| TC-33 | P1 | Markdown safety | Send `<img onerror=…>` and a fenced code block | Renders as escaped text / code; no HTML executes |
+| TC-34 | P1 | Jukebox E2E | Two clients in a hall; paste a YouTube link | Both hear the same audio in sync; 🎵 Jukebox row appears; skip advances; queue lists pending tracks |
+| TC-35 | P1 | Link resolution | Paste a Spotify track link | Title resolves, YouTube match plays, now-playing shows "via spotify→youtube"; garbage input errors cleanly |
+| TC-36 | P1 | Member menu | Right-click a peer and the jukebox | Volume slider changes only local playback; mute-for-me toggles; server mute/kick present only with perms; owner shows neither |
+| TC-37 | P1 | GIF flow | Set a Tenor key, search, click a GIF | Posts inline for everyone; provider tabs match configured keys; no keys → GIF button absent |
+| TC-38 | P1 | Custom emoji | Upload an animated GIF as :party:, type :par → autocomplete, react with it | Animates inline and jumbo when alone; reaction chip shows the image; non-managers see no upload UI |
+| TC-39 | P1 | Emoji cap | Set emoji cap to 4 MB, upload past it | Upload refused with a clear message until cap raised or emojis deleted |
+| TC-40 | P1 | Live caps | Change chat cap as admin, save | Usage readout refreshes; prune honors new value without restart; non-admins see no Storage section |
+| TC-41 | P1 | Stream clarity | Watch a fast-motion share as a second user | No trailing/ghosting after the initial keyframe; sender unaffected |
+| TC-42 | P1 | Pop-out viewer | Click a stream's ⛶, drag it, resize, fit, fullscreen | Floats and moves; fit snaps inside the stage; fullscreen fills the display; closes when the share stops |
+| TC-43 | P1 | Jukebox queue | Queue 3 tracks back-to-back, let them play through | Each advances automatically; none dropped; skip mid-track advances cleanly |
+| TC-44 | P1 | Public host | Set HEARTH_ANNOUNCED_IP to a public IP, open ports, connect off-tailnet | Voice/video/screen all connect with no Tailscale |
+| TC-45 | P1 | Voice bitrate | Set quality to 24 kbps then 510 kbps mid-call | Audio audibly changes; no codec-collision errors; setting persists |
+| TC-46 | P1 | Server monitor | Open Settings → Server as owner | CPU/mem/disk/net update live every 2s; live counts match reality; non-admins never see it |
+| TC-47 | P1 | Service install | Run install-server.sh, reboot | Server auto-starts with no terminal; data survives; --uninstall keeps a data backup |
+| TC-48 | P1 | Native package | makepkg -si on CachyOS, enable the user service | Installs to /opt, runs as service, data in ~/.local/share/hearth |
+| TC-49 | P1 | Auto-update | With a token set, publish a newer release, open Settings | App shows update available; Update now downloads+installs+restarts; reinstall leaves no stale files |
+| TC-50 | P1 | Smooth streams | Two 60fps streams, watch as a third | Full framerate within ~2s of joining; no quarter-rate choppiness |
+| TC-51 | P1 | Focus mode | Click one of two streams | It fills the stage; other shows "paused" and stops consuming; click other to switch; click focused to restore grid |
+| TC-52 | P1 | CI auto-update | Set HEARTH_UPDATE_TOKEN secret, release, run older installed build | Settings shows "update available"; Update now installs and restarts |
+| TC-53 | P1 | One identity | Run via npm start AND the installed build | Same member both ways; no duplicate user; owner claim holds |
+| TC-54 | P1 | Member removal | Admin removes a duplicate member | They vanish from the roster, live sessions boot, messages remain; owner and self are refused |
+| TC-55 | P1 | Live bitrate change | In a voice call, change quality 128k→510k→48k | Audio keeps working each time; no "codec collision"/BUNDLE errors; bitrate audibly changes |
+| TC-56 | P1 | Owner reclaim | Run hearth-reclaim-owner on the host, enter the code in-app | Current identity becomes ★ owner; old owner row loses the crown; works regardless of prior token state |
+| TC-57 | P1 | Stream audio volume | Peer shares a loud game; right-click them | A separate "Stream audio" slider lowers only the game sound, not their voice; present even if their mic is muted |
+| TC-58 | P1 | Mute/deafen feedback | Click the mic/headphone buttons by your name | Button turns solid red + glow, icon switches to 🔇/🔴; muting actually gates the mic (was working before, just invisible on the dark theme) |
+| TC-59 | P1 | Encoder check | Enable the 'stats' toggle during a screen share; try H.264 then VP8 | Overlay shows codec + hw:/sw: encoder; identify which (if any) codec reaches a hardware encoder on this GPU; if all sw:, lower preset to VP8 720p/30 to stop lag |
