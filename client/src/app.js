@@ -1021,7 +1021,14 @@ function removeTile(peerId, tag) {
 }
 
 const audioEls = (peerId) =>
-  document.querySelectorAll(`#audio-sink audio[data-peer="${CSS.escape(peerId)}"]`);
+  document.querySelectorAll(
+    `#audio-sink audio[data-peer="${CSS.escape(peerId)}"]:not([data-tag="screen-audio"])`);
+
+const streamAudioEls = (peerId) =>
+  document.querySelectorAll(
+    `#audio-sink audio[data-peer="${CSS.escape(peerId)}"][data-tag="screen-audio"]`);
+
+const hasStreamAudio = (peerId) => streamAudioEls(peerId).length > 0;
 
 function updateEmptyStage(message) {
   if (state.viewId && state.dirMap.get(state.viewId)?.type === 'text') return;
@@ -1042,8 +1049,10 @@ rtc.on('consumer-added', ({ consumerId, peerId, mediaTag, kind, track }) => {
     el.autoplay = true;
     el.dataset.peer = peerId;
     el.dataset.consumer = consumerId;
+    el.dataset.tag = mediaTag; // 'mic' vs 'screen-audio' — volumed separately
     el.srcObject = new MediaStream([track]);
-    el.volume = state.volumes.get(peerId) ?? 1;
+    const key = mediaTag === 'screen-audio' ? `screen:${peerId}` : peerId;
+    el.volume = state.volumes.get(key) ?? 1;
     el.muted = state.deafened;
     applyOutput(el, settings.audio.outId);
     $('audio-sink').appendChild(el);
@@ -2052,9 +2061,11 @@ function openPeerMenu(x, y, peerId) {
   menu.appendChild(head);
 
   // Volume + mute-for-me: anyone I can currently hear (jukebox included).
-  if (!isSelf && els.length) {
+  if (!isSelf && (els.length || hasStreamAudio(peerId))) {
+    const hasMic = els.length > 0;
     const volRow = document.createElement('div');
     volRow.className = 'ctx-slider';
+    volRow.classList.toggle('hidden', !hasMic);
     const label = document.createElement('span');
     const pct = Math.round((state.volumes.get(peerId) ?? 1) * 100);
     label.textContent = `Volume ${pct}%`;
@@ -2073,6 +2084,7 @@ function openPeerMenu(x, y, peerId) {
 
     const muteRow = document.createElement('button');
     muteRow.className = 'ctx-item';
+    muteRow.classList.toggle('hidden', !hasMic);
     const syncMuteRow = () => {
       const muted = (state.volumes.get(peerId) ?? 1) === 0;
       muteRow.textContent = muted ? '🔊 Unmute for me' : '🔇 Mute for me';
@@ -2095,6 +2107,27 @@ function openPeerMenu(x, y, peerId) {
       syncMuteRow();
     });
     menu.appendChild(muteRow);
+
+    // Separate slider for this peer's SCREEN-SHARE audio (game/desktop
+    // sound) so a loud stream can be lowered without touching their voice.
+    if (hasStreamAudio(peerId)) {
+      const sKey = `screen:${peerId}`;
+      const sRow = document.createElement('div');
+      sRow.className = 'ctx-slider';
+      const sLabel = document.createElement('span');
+      const sPct = Math.round((state.volumes.get(sKey) ?? 1) * 100);
+      sLabel.textContent = `🖥 Stream audio ${sPct}%`;
+      const sVol = document.createElement('input');
+      sVol.type = 'range'; sVol.min = 0; sVol.max = 100; sVol.value = sPct;
+      sVol.addEventListener('input', () => {
+        const v = sVol.value / 100;
+        state.volumes.set(sKey, v);
+        for (const el of streamAudioEls(peerId)) el.volume = v;
+        sLabel.textContent = `🖥 Stream audio ${sVol.value}%`;
+      });
+      sRow.append(sLabel, sVol);
+      menu.appendChild(sRow);
+    }
   }
 
   if (isJukebox && has(myVoicePerms(), P.SPEAK)) {

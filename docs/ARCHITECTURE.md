@@ -350,3 +350,14 @@ owner flag, mints a fresh claim code, and re-opens claiming; enter the code in
 Settings → Server to take ownership on your current identity. The v0.6.4
 userData pin prevents most token churn going forward; this is the guaranteed
 escape hatch when it still happens.
+
+### Independent stream-audio volume (v0.6.6)
+
+Screen-share audio (the `screen-audio` producer — game/desktop sound) shared
+one volume key with the peer's mic, so a loud stream drowned their voice with
+no separate control. Audio elements now carry `data-tag` (mic vs
+screen-audio); `audioEls()` returns mic-only, `streamAudioEls()` the stream,
+each keyed independently (`screen:<peerId>`). The right-click menu shows a
+"🖥 Stream audio" slider whenever the peer shares screen audio — reachable
+even if their mic is muted. Client PKGBUILD icon extraction is now non-fatal
+(guarded), fixing the makepkg 'cannot stat hearth.png' abort.

@@ -11,3 +11,6 @@ server/data/
 server/packaging/pkg/
 server/packaging/*.pkg.tar.zst
 server/packaging/src/
+client/packaging/pkg/
+client/packaging/src/
+*.AppImage
