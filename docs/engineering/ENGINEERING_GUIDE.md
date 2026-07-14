@@ -99,7 +99,7 @@ address (100.64.0.0/10), then a LAN address.
 | `HEARTH_PORT` | `4443` | Express + Socket.IO (signaling) TCP port |
 | `HEARTH_MEDIA_PORT` | `44444` | mediasoup WebRtcServer UDP+TCP port |
 | `HEARTH_DATA_DIR` | `server/data` | SQLite DB + assets location |
-| `HEARTH_CHAT_CAP_MB` | `1024` | Chat storage cap before pruning |
+| `HEARTH_CHAT_CAP_MB` | `5120` | Chat storage cap before pruning |
 | `HEARTH_EMOJI_CAP_MB` | `64` | Custom-emoji storage cap |
 | `HEARTH_PREVIEW_CAP_MB` | `32` | Link-preview cache cap |
 | `HEARTH_TENOR_KEY` | (none) | Tenor GIF API key (optional) |

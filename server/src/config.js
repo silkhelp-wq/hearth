@@ -8,7 +8,7 @@
  *   HEARTH_ANNOUNCED_IP   IP clients use to reach media   (default: autodetect, Tailscale preferred)
  *   HEARTH_NAME           server display name             (default "Hearth")
  *   HEARTH_DATA_DIR       SQLite + state directory        (default <server>/data)
- *   HEARTH_CHAT_CAP_MB    chat DB size cap, prune-oldest  (default 1024)
+ *   HEARTH_CHAT_CAP_MB    chat DB size cap, prune-oldest  (default 5120)
  */
 
 const os = require('os');
@@ -54,7 +54,7 @@ module.exports = {
   dbPath: path.join(dataDir, 'hearth.db'),
 
   chat: {
-    capBytes: Number(process.env.HEARTH_CHAT_CAP_MB || 1024) * 1024 * 1024,
+    capBytes: Number(process.env.HEARTH_CHAT_CAP_MB || 5120) * 1024 * 1024,
     maxMessageLen: 4000,
     pruneBatch: 500,
     pruneIntervalMs: 30 * 60 * 1000
@@ -63,7 +63,7 @@ module.exports = {
   storage: {
     // Env values are DEFAULTS; the owner can change these live in
     // Settings -> Server -> Storage (persisted in the kv table).
-    chatCapMB: Number(process.env.HEARTH_CHAT_CAP_MB || 1024),
+    chatCapMB: Number(process.env.HEARTH_CHAT_CAP_MB || 5120),
     emojiCapMB: Number(process.env.HEARTH_EMOJI_CAP_MB || 64),
     previewCapMB: Number(process.env.HEARTH_PREVIEW_CAP_MB || 32),
     emojiMaxKB: 512

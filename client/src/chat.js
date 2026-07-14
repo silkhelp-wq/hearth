@@ -58,15 +58,45 @@ export function createChat({ rtc, getMe, getUsers, getRoles, getChannel,
   const emojiById = (id) => (getEmojis() || []).find((e) => e.id === id) || null;
   const emojiCtx = () => ({ map: emojiMap(), base: getBaseUrl() });
 
-  /** Bare CDN link from an approved media host → inline gif. */
-  function mediaUrl(content) {
+  function linkFallback(url) {
+    const a = document.createElement('a');
+    a.href = url; a.target = '_blank'; a.rel = 'noreferrer noopener';
+    a.textContent = url;
+    return a;
+  }
+
+  /** A message that is a single bare https URL → inline media embed.
+   *  Returns { kind: 'img'|'video'|'youtube', url, id? } or null. */
+  function mediaEmbed(content) {
     const t = String(content).trim();
     if (!t || /\s/.test(t)) return null;
-    try {
-      const u = new URL(t);
-      const hosts = getCaps()?.mediaHosts || [];
-      if (hosts.includes(u.hostname.toLowerCase())) return t;
-    } catch { /* not a url */ }
+    let u;
+    try { u = new URL(t); } catch { return null; }
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
+
+    // YouTube → lite embed (thumbnail, click to play)
+    const host = u.hostname.toLowerCase().replace(/^www\./, '');
+    let ytId = null;
+    if (host === 'youtu.be') ytId = u.pathname.slice(1).split('/')[0];
+    else if (host === 'youtube.com' || host === 'm.youtube.com') {
+      if (u.pathname === '/watch') ytId = u.searchParams.get('v');
+      else if (u.pathname.startsWith('/shorts/')) ytId = u.pathname.split('/')[2];
+      else if (u.pathname.startsWith('/embed/')) ytId = u.pathname.split('/')[2];
+    }
+    if (ytId && /^[\w-]{6,20}$/.test(ytId)) {
+      return { kind: 'youtube', url: t, id: ytId };
+    }
+
+    const path = u.pathname.toLowerCase();
+    if (/\.(mp4|webm|mov|m4v)$/.test(path)) return { kind: 'video', url: t };
+    if (/\.(gif|png|jpe?g|webp|avif)$/.test(path)) return { kind: 'img', url: t };
+
+    // Approved GIF-picker CDNs (tenor/giphy) — extensionless URLs are
+    // images unless the path says mp4.
+    const hosts = getCaps()?.mediaHosts || [];
+    if (hosts.includes(u.hostname.toLowerCase())) {
+      return { kind: /mp4|webm/.test(path) ? 'video' : 'img', url: t };
+    }
     return null;
   }
 
@@ -200,18 +230,54 @@ export function createChat({ rtc, getMe, getUsers, getRoles, getChannel,
 
     const body = document.createElement('div');
     body.className = 'msg-body';
-    const media = mediaUrl(m.content);
-    if (media) {
+    const media = mediaEmbed(m.content);
+    if (media?.kind === 'img') {
       const a = document.createElement('a');
-      a.href = media; a.target = '_blank'; a.rel = 'noreferrer noopener';
+      a.href = media.url; a.target = '_blank'; a.rel = 'noreferrer noopener';
       a.className = 'chat-gif-wrap';
       const img = document.createElement('img');
       img.className = 'chat-gif';
-      img.src = media;
-      img.loading = 'lazy';
-      img.alt = 'gif';
+      img.src = media.url;
+      img.loading = 'lazy';           // fetch only when scrolled into view
+      img.alt = 'image';
+      img.addEventListener('error', () => {
+        a.replaceWith(linkFallback(media.url));
+      });
       a.appendChild(img);
       body.appendChild(a);
+    } else if (media?.kind === 'video') {
+      const v = document.createElement('video');
+      v.className = 'chat-video';
+      v.src = media.url;
+      v.controls = true;
+      v.preload = 'metadata';         // header only — no RAM-heavy prefetch
+      v.playsInline = true;
+      v.addEventListener('error', () => {
+        v.replaceWith(linkFallback(media.url));
+      });
+      body.appendChild(v);
+    } else if (media?.kind === 'youtube') {
+      // Lite embed: a thumbnail until clicked, then the nocookie player.
+      // Nothing is loaded from YouTube besides one jpg until you press play.
+      const lite = document.createElement('div');
+      lite.className = 'yt-lite';
+      lite.style.backgroundImage =
+        `url(https://i.ytimg.com/vi/${media.id}/hqdefault.jpg)`;
+      const play = document.createElement('button');
+      play.className = 'yt-play';
+      play.title = 'Play on YouTube (embedded)';
+      play.textContent = '▶';
+      lite.appendChild(play);
+      lite.addEventListener('click', () => {
+        const frame = document.createElement('iframe');
+        frame.className = 'yt-frame';
+        frame.src =
+          `https://www.youtube-nocookie.com/embed/${media.id}?autoplay=1`;
+        frame.allow = 'autoplay; encrypted-media; picture-in-picture';
+        frame.allowFullscreen = true;
+        lite.replaceWith(frame);
+      }, { once: true });
+      body.appendChild(lite);
     } else {
       body.innerHTML = renderMarkdown(m.content, names(), me().name, emojiCtx()) +
         (m.editedAt ? ' <span class="edited">(edited)</span>' : '');

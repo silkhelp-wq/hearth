@@ -141,3 +141,7 @@ extract for any failure. File issues with TC ID in the title.
 | TC-63 | P1 | Master switch | Untick "Enable all notifications" | Every sound/toast stops incl. mention ping; per-event boxes grey out; re-tick restores prior per-event choices |
 | TC-64 | P1 | Stream PiP | While a peer streams, click a text channel | Stream shrinks to a draggable mini-window over chat; click returns to the stage focused on it; ✕ hides it until the stream changes; ends when the stream stops |
 | TC-65 | P1 | Self badge sync | Start/stop a share; mute/unmute; deafen | Your OWN rail badges (🖥/🔇/⛔) change instantly on every toggle — no lingering stream icon after Stop |
+| TC-66 | P1 | Image embeds | Paste a bare https .gif and .png URL as messages | Each renders inline (lazy-loaded), click opens original; a dead link degrades to a plain link, never a broken-image icon |
+| TC-67 | P1 | Video embeds | Paste a bare .mp4/.webm URL | Inline video player with controls; only metadata preloads until you press play; dead link degrades to a plain link |
+| TC-68 | P1 | YouTube lite embed | Paste a youtube.com/watch and a youtu.be link | Thumbnail + ▶ renders (one jpg fetched); click swaps in the nocookie player and plays; nothing else loads before the click |
+| TC-69 | P1 | 5 GB chat cap | Fresh install; check Settings → Server storage caps | Chat history default reads 5120 MB; prune-oldest still enforces the cap |

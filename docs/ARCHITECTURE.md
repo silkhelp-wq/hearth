@@ -402,3 +402,24 @@ from a stale local cache and could linger after the state changed (e.g. the
 stream icon surviving a share stop). `broadcastState` now mirrors the snapshot
 into the sender's own cached peer entry and refreshes the rail immediately;
 self-state never depends on a round trip that doesn't include you.
+
+### Chat media embeds + 5 GB chat cap (v0.8.0)
+
+A message that is a single bare https URL now embeds: images
+(gif/png/jpg/webp/avif) render inline lazily; video files (mp4/webm/mov) get a
+real `<video controls preload="metadata">` player (fixing the old
+broken-image rendering of mp4 links, which the picker-CDN allowlist funneled
+into an `<img>`); YouTube links render as a lite embed — one thumbnail jpg,
+and the youtube-nocookie player only loads on click. Dead media degrades to a
+plain link via error handlers. All embeds are DOM-constructed (no innerHTML)
+and the CSP was widened deliberately: `img-src https:`, `media-src https:`,
+`frame-src youtube-nocookie.com` only.
+
+Memory posture: nothing new is cached in RAM by Hearth — link-preview cards
+stay in the SQLite `link_previews` table (own cap), images are lazy-loaded,
+video preloads metadata only, and YouTube loads nothing until clicked.
+Chromium's transient decode buffers remain Chromium's own.
+
+The chat storage default rose 1 GB → **5 GB** (`HEARTH_CHAT_CAP_MB=5120`),
+still rolling-prune-oldest at the cap. Existing servers keep their stored
+setting — raise it in Settings → Server → storage caps.
