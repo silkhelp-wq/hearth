@@ -94,7 +94,12 @@ h1, h2, h3, .rail-title, .th-title {
   cursor: pointer;
 }
 .icon-btn:hover { color: var(--parchment); background: var(--panel-2); }
-.icon-btn.active { color: var(--danger); }
+.icon-btn.active {
+  color: #fff;
+  background: var(--danger);
+  box-shadow: 0 0 8px rgba(224, 100, 79, 0.5);
+}
+.icon-btn.active:hover { background: var(--danger); filter: brightness(1.1); }
 
 .field { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
 .field > span, .field-label {
