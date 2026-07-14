@@ -128,31 +128,58 @@ app.whenReady().then(() => {
   // picker chose. With the PipeWire flag above, getSources() on Wayland
   // brings up the system portal; on X11/Windows/macOS it enumerates
   // screens and windows directly.
+  // Screen-share source resolution.
+  //
+  // Wayland is fundamentally different: every desktopCapturer.getSources()
+  // call raises the system portal. So the OLD flow (enumerate for a picker,
+  // then getDisplayMedia) prompted the portal TWICE and the mismatched
+  // sessions aborted. On Wayland we therefore let the portal be the ONLY
+  // picker — the renderer sends no pre-chosen id, and we hand libwebrtc the
+  // single source the portal returns. X11/Windows/macOS keep the richer
+  // in-app picker (their getSources() does not prompt).
+  const isWayland = process.platform === 'linux' &&
+    (process.env.WAYLAND_DISPLAY || process.env.XDG_SESSION_TYPE === 'wayland');
+
   session.defaultSession.setDisplayMediaRequestHandler(
     async (_request, callback) => {
       try {
         const choice = pendingShare;
         pendingShare = null;
+
+        if (isWayland) {
+          // Portal is the picker. getSources() opens it once; the user's
+          // approved screen/window comes back as the (usually only) source.
+          const sources = await desktopCapturer.getSources({
+            types: ['screen', 'window'],
+            thumbnailSize: { width: 0, height: 0 }
+          });
+          const source = sources[0];
+          if (!source) {
+            console.error('[share] Wayland portal returned no source (cancelled?)');
+            return callback(null);
+          }
+          const wantLoopback = choice?.withAudio;
+          return callback({
+            video: source,
+            audio: wantLoopback ? 'loopback' : undefined
+          });
+        }
+
         const sources = await desktopCapturer.getSources({
           types: ['screen', 'window'],
           thumbnailSize: { width: 0, height: 0 }
         });
-        // Strict id match on Windows/macOS: falling back to sources[0]
+        // Strict id match on Windows/macOS/X11: falling back to sources[0]
         // there is how a machine with broken capture ends up silently
-        // sharing Hearth's own window. Linux is the exception — under
-        // PipeWire this call opens a NEW portal session that returns the
-        // single source the user just approved, with a fresh id that can
-        // never equal the picker's, so that one source IS the answer.
-        const source = (choice && sources.find((s) => s.id === choice.id)) ||
-          (process.platform === 'linux' ? sources[0] : null);
+        // sharing Hearth's own window.
+        const source = choice && sources.find((s) => s.id === choice.id);
         if (!source) {
           console.error('[share] picked source not capturable:',
             choice?.id, '— enumerated', sources.length, 'sources');
           return callback(null);
         }
 
-        const wantLoopback =
-          choice?.withAudio && process.platform === 'win32';
+        const wantLoopback = choice?.withAudio && process.platform === 'win32';
         callback({ video: source, audio: wantLoopback ? 'loopback' : undefined });
       } catch (err) {
         console.error('[share] handler failed:', err.message);

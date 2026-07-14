@@ -710,11 +710,24 @@ async function openSharePicker() {
   $('modal-share').showModal();
 
   const grid = $('share-sources');
+
+  // Wayland: the OS portal is the picker. Enumerating here would prompt it a
+  // second time and abort. So show no in-app list — just let "Go live" fire
+  // getDisplayMedia, which raises the portal once.
+  if (bridge.isWayland) {
+    pickedSource = null; // signals "let the portal choose" to startShare
+    grid.innerHTML =
+      '<p class="hint">On Wayland, your desktop\u2019s screen picker will open ' +
+      'when you click <b>Go live</b> — choose the screen or window there.</p>';
+    $('btn-share-start').disabled = false;
+    return;
+  }
+
   grid.textContent = 'Looking for screens and windows…';
   const sources = await bridge.getScreenSources();
   grid.textContent = '';
   if (!sources.length) {
-    grid.textContent = 'Nothing to share was found. On Wayland, approve the screen picker when it appears.';
+    grid.textContent = 'Nothing to share was found.';
     return;
   }
   if (bridge.platform === 'win32' && sources.every((s) => !s.thumbnail)) {
@@ -766,7 +779,16 @@ async function startShare() {
   saveSettings();
 
   const withAudio = $('share-audio').checked;
-  await bridge.chooseShareSource({ id: pickedSource.id, withAudio });
+  // Wayland: pickedSource is null by design — the portal picks. Other
+  // platforms require an in-app selection.
+  if (!bridge.isWayland && !pickedSource) {
+    updateEmptyStage('Pick a screen or window first.');
+    return;
+  }
+  await bridge.chooseShareSource({
+    id: pickedSource ? pickedSource.id : null,
+    withAudio
+  });
 
   const video = p.width
     ? { width: { ideal: p.width }, height: { ideal: p.height }, frameRate: { ideal: p.fps } }

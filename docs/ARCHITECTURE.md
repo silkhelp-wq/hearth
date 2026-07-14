@@ -283,3 +283,15 @@ Releases API. The app downloads the matching platform asset (AppImage
 self-replaces; others hand off to the OS installer) and restarts; the server
 reports availability and is updated by re-running its installer. No token →
 feature silently disabled, app still works.
+
+### Wayland screen-share fix (v0.6.2)
+
+On Wayland every `desktopCapturer.getSources()` call raises the xdg-desktop
+portal. The old two-step flow (enumerate to build an in-app picker, then
+`getDisplayMedia`) therefore prompted the portal TWICE, and the mismatched
+portal sessions aborted with `AbortError` after the user picked in both
+dialogs. The fix makes the portal the sole picker on Wayland: the share
+dialog shows no in-app source grid there (just quality/codec/audio), and
+"Go live" fires a single `getDisplayMedia`, whose one portal prompt is the
+picker. X11/Windows/macOS keep the in-app source list — their getSources()
+doesn't prompt. Wayland is detected via WAYLAND_DISPLAY / XDG_SESSION_TYPE.

@@ -3,6 +3,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('hearth', {
   platform: process.platform,
+  isWayland: process.platform === 'linux' &&
+    Boolean(process.env.WAYLAND_DISPLAY || process.env.XDG_SESSION_TYPE === 'wayland'),
 
   // Screen share
   getScreenSources: () => ipcRenderer.invoke('share:getSources'),
