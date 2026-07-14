@@ -1,0 +1,69 @@
+# Maintainer: Mages of the Beaches LLC
+# PKGBUILD for the Hearth desktop client on CachyOS / Arch.
+#
+# electron-builder's own "pacman" target is unreliable in CI (it shells out
+# to fpm and breaks on non-sh shells / minimal runners), so we build the
+# universal AppImage in CI and wrap it natively here instead — the approach
+# Arch upstreams actually recommend.
+#
+# Build & install:
+#   cd client
+#   npm install && npm run build && npx electron-builder --linux AppImage
+#   cd packaging
+#   makepkg -si
+#
+# It picks up the AppImage from ../release/ automatically.
+
+pkgname=hearth
+pkgver=0.6.1
+pkgrel=1
+pkgdesc="Self-hosted voice/video/screen-share/chat client (Hearth)"
+arch=('x86_64')
+url="https://github.com/silkhelp-wq/hearth"
+license=('MIT')
+depends=('fuse2' 'gtk3' 'nss' 'alsa-lib')
+options=('!strip')
+
+package() {
+  # Locate the AppImage electron-builder produced.
+  local appimage
+  appimage="$(ls -1 "$startdir/../release/"*.AppImage 2>/dev/null | head -n1)"
+  if [ -z "$appimage" ]; then
+    echo "ERROR: no AppImage in ../release/ — run 'npx electron-builder --linux AppImage' first."
+    return 1
+  fi
+
+  install -Dm755 "$appimage" "$pkgdir/opt/hearth/Hearth.AppImage"
+
+  # Launcher wrapper.
+  install -dm755 "$pkgdir/usr/bin"
+  cat > "$pkgdir/usr/bin/hearth" <<'EOF'
+#!/bin/sh
+exec /opt/hearth/Hearth.AppImage "$@"
+EOF
+  chmod 755 "$pkgdir/usr/bin/hearth"
+
+  # Desktop entry + icon (extract icon from the AppImage if present).
+  install -dm755 "$pkgdir/usr/share/applications"
+  cat > "$pkgdir/usr/share/applications/hearth.desktop" <<'EOF'
+[Desktop Entry]
+Name=Hearth
+Comment=Voice, video, screen-share, and chat for your crew
+Exec=hearth
+Icon=hearth
+Terminal=false
+Type=Application
+Categories=Network;AudioVideo;
+EOF
+
+  # Try to pull a 256px icon out of the AppImage for the launcher.
+  local tmp
+  tmp="$(mktemp -d)"
+  ( cd "$tmp" && "$appimage" --appimage-extract '*.png' >/dev/null 2>&1 || true )
+  local icon
+  icon="$(find "$tmp" -name '*.png' 2>/dev/null | sort | tail -n1)"
+  if [ -n "$icon" ]; then
+    install -Dm644 "$icon" "$pkgdir/usr/share/icons/hicolor/256x256/apps/hearth.png"
+  fi
+  rm -rf "$tmp"
+}

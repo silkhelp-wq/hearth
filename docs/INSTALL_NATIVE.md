@@ -54,9 +54,9 @@ for a backup. Upgrades and removals never touch it.
 
 ## Desktop app — install & auto-update
 
-The installers (`.AppImage`, `.deb`, `.pacman` for Arch/CachyOS, `.exe`,
-`.dmg`) come from the private repo's Releases. Install once, then the app
-**checks for updates on its own**:
+The installers come from the private repo's Releases:
+`.AppImage` (universal Linux), `.deb` (Debian/Ubuntu), `.exe` (Windows),
+`.dmg` (macOS). Install once, then the app **checks for updates on its own**:
 
 - On launch it quietly checks the repo's latest release.
 - In **Settings → Audio** (top row) you see the current version and a
@@ -68,6 +68,24 @@ The installers (`.AppImage`, `.deb`, `.pacman` for Arch/CachyOS, `.exe`,
 Re-installing over an old version replaces all program files, so nothing
 stale is left behind on any OS. Your settings live in the app's profile and
 carry over.
+
+### Native CachyOS / Arch client package
+
+electron-builder's pacman target is unreliable in CI, so the AppImage is the
+CI Linux artifact and the native Arch package is built locally from it:
+
+```
+cd client
+npm install && npm run build
+npx electron-builder --linux AppImage
+cd packaging
+makepkg -si
+```
+
+That wraps the AppImage into a real pacman package (`hearth` in your menu,
+`hearth` on the command line), removable with `sudo pacman -R hearth`. The
+in-app auto-updater still works — it updates the AppImage inside `/opt/hearth`
+in place.
 
 ## Auto-update on a PRIVATE repo — the token
 
