@@ -45,7 +45,7 @@ triaged with issues filed.
 
 Severity: **P0** = release-blocking, **P1** = should-fix.
 
-| ID | Pri | Traces | Steps | Expected |
+| ID&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Pri | Traces&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Steps | Expected |
 |---|---|---|---|---|
 | TC-01 | P0 | NFR-3 | Install & launch client on each OS (source and packaged) | App opens to connect screen; mic permission prompt on first join |
 | TC-02 | P0 | FR-1/2, NFR-5 | Fresh friend follows CONNECTION_GUIDE end-to-end | Connected in ≤10 min; console shows `linked · <ms>` |
