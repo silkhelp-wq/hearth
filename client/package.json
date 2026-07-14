@@ -1,7 +1,7 @@
 {
   "name": "hearth",
   "productName": "Hearth",
-  "version": "0.6.4",
+  "version": "0.6.5",
   "description": "Self-hosted voice, camera, screen-share, and chat hangout for your crew",
   "homepage": "https://github.com/silkhelp-wq/hearth",
   "license": "MIT",

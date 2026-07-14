@@ -174,20 +174,40 @@ export class HearthRTC extends Emitter {
     };
   }
 
-  /** Set the opus target bitrate (bps) and re-apply to any live producers. */
+  /** Change the opus bitrate. The fmtp `maxaveragebitrate` is fixed at
+   *  producer creation and CANNOT be renegotiated — patching setParameters
+   *  leaves a live producer on the old value while a new one uses the new
+   *  one, and two different fmtp on PT 111 is a fatal BUNDLE collision. So
+   *  we set the target and REPLACE every audio producer as a unit, tearing
+   *  each down before creating its replacement so they never coexist. */
   async setAudioBitrate(bps) {
-    HearthRTC.audioBitrate = Math.max(16000, Math.min(510000, bps | 0));
-    for (const tag of ['mic', 'screen-audio']) {
-      const producer = this.producers.get(tag);
-      const sender = producer?.rtpSender;
-      if (!sender?.getParameters) continue;
-      try {
-        const params = sender.getParameters();
-        if (params.encodings?.[0]) {
-          params.encodings[0].maxBitrate = HearthRTC.audioBitrate;
-          await sender.setParameters(params);
-        }
-      } catch { /* older browser; takes effect on next produce */ }
+    const next = Math.max(16000, Math.min(510000, bps | 0));
+    if (next === HearthRTC.audioBitrate) return;
+    HearthRTC.audioBitrate = next;
+
+    // Recreate the mic at the new bitrate, reusing the same track.
+    const mic = this.producers.get('mic');
+    if (mic && !mic.closed) {
+      const track = mic.track;
+      await this.closeProducer('mic');
+      if (track && track.readyState === 'live') {
+        await this.produceMic(track);
+      }
+    }
+    // Recreate screen-audio if a screen share is active.
+    const sa = this.producers.get('screen-audio');
+    if (sa && !sa.closed) {
+      const track = sa.track;
+      await this.closeProducer('screen-audio');
+      if (track && track.readyState === 'live') {
+        const audio = await this.sendTransport.produce({
+          track,
+          encodings: [{ maxBitrate: HearthRTC.audioBitrate }],
+          codecOptions: { ...HearthRTC.opusOptions() },
+          appData: { mediaTag: 'screen-audio' }
+        });
+        this.producers.set('screen-audio', audio);
+      }
     }
   }
 

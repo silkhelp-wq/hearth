@@ -136,3 +136,5 @@ extract for any failure. File issues with TC ID in the title.
 
 | TC-53 | One identity | Run via npm start AND the installed build | Same member both ways; no duplicate user; owner claim holds |
 | TC-54 | Member removal | Admin removes a duplicate member | They vanish from the roster, live sessions boot, messages remain; owner and self are refused |
+
+| TC-55 | Live bitrate change | In a voice call, change quality 128k→510k→48k | Audio keeps working each time; no "codec collision"/BUNDLE errors; bitrate audibly changes |

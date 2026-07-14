@@ -1767,14 +1767,22 @@ function positionVadMark() {
 
 async function onAudioSettingsChanged() {
   settings.audio.inId = $('set-mic').value;
+  const prevBitrate = HearthRTC.audioBitrate;
   settings.audio.ec = $('set-ec').checked;
   settings.audio.ns = $('set-ns').checked;
   settings.audio.agc = $('set-agc').checked;
   settings.audio.music = $('set-music').checked;
   settings.audio.bitrate = Number($('set-audio-bitrate').value) || 128000;
   saveSettings();
-  await rtc.setAudioBitrate(settings.audio.bitrate);
-  if (state.micStream || rtc.joined) await startMic();
+  const bitrateChanged = settings.audio.bitrate !== prevBitrate;
+  // startMic rebuilds the mic for EC/NS/AGC/device changes; setAudioBitrate
+  // rebuilds it for bitrate. Run exactly ONE so the mic producer is never
+  // created twice (two PT-111 producers = fatal opus fmtp collision).
+  if (bitrateChanged) {
+    await rtc.setAudioBitrate(settings.audio.bitrate);
+  } else if (state.micStream || rtc.joined) {
+    await startMic();
+  }
 }
 
 async function bindPtt() {

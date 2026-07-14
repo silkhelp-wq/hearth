@@ -326,3 +326,15 @@ every launch mode. Administrators also get **member removal** (`member:remove`):
 boots live sockets, deletes the user row + role/reaction/read-state
 references, keeps their messages (ghost author), and can never target the
 owner or yourself — the cleanup tool for duplicate identities.
+
+### Audio-bitrate fmtp collision fix (v0.6.5)
+
+Opus `maxaveragebitrate` is fixed at producer creation and cannot be
+renegotiated. The v0.6 live-bitrate control patched `maxBitrate` via
+setParameters but left the *fmtp* untouched, so an existing producer kept its
+old bitrate while a newly-created one used the new value — two different fmtp
+on PT 111 = a fatal BUNDLE collision that broke audio negotiation. Fix:
+`setAudioBitrate` now REPLACES every audio producer (mic + screen-audio) as a
+unit, closing each before creating its replacement so mismatched producers
+never coexist; and `onAudioSettingsChanged` runs exactly one of
+setAudioBitrate / startMic so the mic is never produced twice.
