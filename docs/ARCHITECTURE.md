@@ -361,3 +361,18 @@ each keyed independently (`screen:<peerId>`). The right-click menu shows a
 "🖥 Stream audio" slider whenever the peer shares screen audio — reachable
 even if their mic is muted. Client PKGBUILD icon extraction is now non-fatal
 (guarded), fixing the makepkg 'cannot stat hearth.png' abort.
+
+### Hardware-encode reality on Linux/NVIDIA (v0.6.8)
+
+Chromium's Linux hardware video *encode* goes through VA-API, and on NVIDIA
+the nvidia-vaapi-driver is decode-only — so NVENC is NOT exposed to
+Chromium's WebRTC encoder. This is the architectural reason browser-WebRTC
+screen share is software-encoded (and CPU-bound / laggy at 4K) while
+Sunshine/Moonlight are smooth: they call NVENC directly via the NVIDIA SDK,
+bypassing VA-API. No Electron flag changes this. v0.6.8 adds the fuller
+VA-API + WebRtcHW264Encoding flag set for the best chance of a hardware path
+(H.264 is the codec most likely to reach one on NVIDIA), and the stats
+overlay already reports the live encoder as hw:/sw: so you can verify. If it
+reads sw: on NVIDIA, the realistic mitigation is VP8 + lower res/fps to make
+software encode keep up, or accept the constraint and use Sunshine for
+game-grade streaming.

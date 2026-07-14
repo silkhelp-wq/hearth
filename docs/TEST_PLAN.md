@@ -142,3 +142,7 @@ extract for any failure. File issues with TC ID in the title.
 | TC-56 | Owner reclaim | Run hearth-reclaim-owner on the host, enter the code in-app | Current identity becomes ★ owner; old owner row loses the crown; works regardless of prior token state |
 
 | TC-57 | Stream audio volume | Peer shares a loud game; right-click them | A separate "Stream audio" slider lowers only the game sound, not their voice; present even if their mic is muted |
+
+| TC-58 | Mute/deafen feedback | Click the mic/headphone buttons by your name | Button turns solid red + glow, icon switches to 🔇/🔴; muting actually gates the mic (was working before, just invisible on the dark theme) |
+
+| TC-59 | Encoder check | Enable the 'stats' toggle during a screen share; try H.264 then VP8 | Overlay shows codec + hw:/sw: encoder; identify which (if any) codec reaches a hardware encoder on this GPU; if all sw:, lower preset to VP8 720p/30 to stop lag |

@@ -29,7 +29,12 @@ app.setPath('userData', path.join(app.getPath('appData'), 'Hearth'));
 // OFF by default on Windows, so RTX/Arc/RDNA3 machines would otherwise
 // software-encode AV1 shares.
 app.commandLine.appendSwitch('enable-features',
-  'WebRTCPipeWireCapturer,AcceleratedVideoEncoder,WebRtcAV1HWEncode');
+  'WebRTCPipeWireCapturer,AcceleratedVideoEncoder,VaapiVideoEncoder,VaapiVideoDecoder,WebRtcAV1HWEncode');
+// Prefer hardware H.264 in WebRTC where the platform can provide it — on
+// NVIDIA/Linux this is the codec most likely to reach a hardware encoder,
+// since VP9/AV1 hardware encode via Chromium's VA-API path is effectively
+// unavailable there (NVENC isn't exposed to Chromium's encoder).
+app.commandLine.appendSwitch('enable-features', 'WebRtcHW264Encoding');
 // Chromium's Vulkan path conflicts with ozone-wayland ('not compatible with
 // Vulkan' spam) and buys nothing on the NVIDIA GL stack — force it off.
 if (process.platform === 'linux') {
