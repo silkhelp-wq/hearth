@@ -338,3 +338,15 @@ on PT 111 = a fatal BUNDLE collision that broke audio negotiation. Fix:
 unit, closing each before creating its replacement so mismatched producers
 never coexist; and `onAudioSettingsChanged` runs exactly one of
 setAudioBitrate / startMic so the mic is never produced twice.
+
+### Owner recovery from the host (v0.6.5)
+
+Ownership binds to a client device token; if that token changes (reinstall
+into a different profile, browser tab, data reset) the crown strands on the
+old identity with no in-app way back — you'd be locked out. Fix: the server
+operator can always reclaim from the box. `index.js --reclaim-owner` (wrapped
+as the `hearth-reclaim-owner` command the package puts on PATH) clears the
+owner flag, mints a fresh claim code, and re-opens claiming; enter the code in
+Settings → Server to take ownership on your current identity. The v0.6.4
+userData pin prevents most token churn going forward; this is the guaranteed
+escape hatch when it still happens.

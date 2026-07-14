@@ -138,3 +138,5 @@ extract for any failure. File issues with TC ID in the title.
 | TC-54 | Member removal | Admin removes a duplicate member | They vanish from the roster, live sessions boot, messages remain; owner and self are refused |
 
 | TC-55 | Live bitrate change | In a voice call, change quality 128k→510k→48k | Audio keeps working each time; no "codec collision"/BUNDLE errors; bitrate audibly changes |
+
+| TC-56 | Owner reclaim | Run hearth-reclaim-owner on the host, enter the code in-app | Current identity becomes ★ owner; old owner row loses the crown; works regardless of prior token state |

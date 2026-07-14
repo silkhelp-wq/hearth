@@ -220,6 +220,19 @@ function claimOwner(userId, code) {
 const ownerClaimed = () => Boolean(kvGet('owner_claimed'));
 const ownerCode = () => kvGet('owner_code');
 
+/** Host-side owner recovery: mint a fresh claim code and re-open claiming.
+ *  Whoever controls the server box can always reclaim ownership this way,
+ *  even after a device-token change stranded the old owner. Returns the
+ *  new code. Existing owner rows are cleared so claiming assigns cleanly. */
+function regenerateClaimCode() {
+  const code = require('crypto').randomBytes(4).toString('hex').toUpperCase()
+    .replace(/(.{4})(.{4})/, '$1-$2');
+  db.prepare('UPDATE users SET is_owner = 0 WHERE is_owner = 1').run();
+  kvSet('owner_code', code);
+  kvSet('owner_claimed', '');
+  return code;
+}
+
 /* ────────────────────────────── roles ──────────────────────────────── */
 
 function listRoles() {
@@ -720,7 +733,7 @@ module.exports = {
   history, lastMessageIds, hydrateMessages,
   toggleReaction, setPin, listPins, markRead, readState,
   search, getPreview, savePreview,
-  deleteUser, transferOwner,
+  deleteUser, transferOwner, regenerateClaimCode,
   listEmojis, emojiByName, emojiById, addEmoji, deleteEmoji, emojiTotalBytes,
   getStorageSettings, setStorageSettings, previewCacheBytes, prunePreviews,
   dbSizeBytes, pruneToCap

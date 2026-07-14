@@ -42,6 +42,15 @@ package() {
   ( cd "$dest" && npm install-scripts approve mediasoup better-sqlite3 >/dev/null 2>&1 || true )
   ( cd "$dest" && npm rebuild mediasoup better-sqlite3 >/dev/null 2>&1 || true )
 
+  # Owner-reclaim helper on PATH: `hearth-reclaim-owner`.
+  install -Dm755 "$startdir/../reclaim-owner.sh" "$pkgdir/opt/hearth-server/reclaim-owner.sh"
+  install -dm755 "$pkgdir/usr/bin"
+  cat > "$pkgdir/usr/bin/hearth-reclaim-owner" <<'WRAP'
+#!/bin/sh
+exec /opt/hearth-server/reclaim-owner.sh "$@"
+WRAP
+  chmod 755 "$pkgdir/usr/bin/hearth-reclaim-owner"
+
   # systemd USER service — data + env live under the user's home.
   install -dm755 "$pkgdir/usr/lib/systemd/user"
   cat > "$pkgdir/usr/lib/systemd/user/hearth-server.service" <<'EOF'

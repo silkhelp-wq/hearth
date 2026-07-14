@@ -29,6 +29,7 @@ const selfupdate = require('./selfupdate');
 const { P, ALL, has } = require('./perms');
 
 const SELFTEST = process.argv.includes('--selftest');
+const RECLAIM = process.argv.includes('--reclaim-owner');
 const VERSION = require('../package.json').version;
 
 /* ─────────────────────────── speed test app ────────────────────────── */
@@ -633,7 +634,20 @@ async function selftest() {
   }
 }
 
-(SELFTEST ? selftest() : main()).catch((err) => {
+function reclaimOwner() {
+  db.init({ dbPath: config.dbPath, seedVoiceChannels: config.seedVoiceChannels });
+  const code = db.regenerateClaimCode();
+  console.log('');
+  console.log('  ┌─────────────────────────────────────────────┐');
+  console.log('  │  Ownership reset. New claim code:           │');
+  console.log(`  │      ${code}                          │`);
+  console.log('  │  Enter it in Settings → Server to claim.    │');
+  console.log('  └─────────────────────────────────────────────┘');
+  console.log('');
+  return Promise.resolve();
+}
+
+(SELFTEST ? selftest() : RECLAIM ? reclaimOwner() : main()).catch((err) => {
   console.error('fatal:', err);
   process.exit(1);
 });

@@ -110,3 +110,17 @@ The token file is git-ignored, so it never lands in the repo.
 Everything here works with the repo private. The only public surface is the
 release assets, which only someone with the token (your friends' installed
 apps) can fetch. Nothing about the source is exposed.
+
+
+## Locked out of ownership?
+
+If the ★ owner is stranded on an old identity (a reinstall or browser tab
+minted a new device token), reclaim from the host:
+
+```
+hearth-reclaim-owner
+```
+
+It stops the service, prints a fresh claim code, and restarts. Enter the code
+in Settings → Server to become owner on your current client. Then remove any
+duplicate members from the roster.
