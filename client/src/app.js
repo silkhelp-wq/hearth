@@ -748,13 +748,21 @@ function setDeafened(deafened) {
   broadcastState();
 }
 
-const broadcastState = () =>
-  rtc.joined
-    ? rtc.request('peer:state', {
-        muted: state.muted, deafened: state.deafened,
-        camOn: state.camOn, sharing: state.sharing
-      }).catch(() => {})
+const broadcastState = () => {
+  const snap = {
+    muted: state.muted, deafened: state.deafened,
+    camOn: state.camOn, sharing: state.sharing
+  };
+  // The server relays peer:state to OTHERS only (socket.to excludes the
+  // sender), so our own rail badge must be mirrored locally or it goes
+  // stale — e.g. the 🖥 icon lingering after a share stops.
+  const mine = state.peers.get(state.me?.id);
+  if (mine) mine.state = { ...mine.state, ...snap };
+  refreshRailStates();
+  return rtc.joined
+    ? rtc.request('peer:state', snap).catch(() => {})
     : Promise.resolve();
+};
 
 function setServerMuted(muted) {
   state.serverMutedMe = muted;

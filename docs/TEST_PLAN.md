@@ -140,3 +140,4 @@ extract for any failure. File issues with TC ID in the title.
 | TC-62 | P1 | Viewer notify | Second client focuses/watches your stream | You get one "X is watching your stream" toast+sound; focus-switching back and forth does NOT repeat it |
 | TC-63 | P1 | Master switch | Untick "Enable all notifications" | Every sound/toast stops incl. mention ping; per-event boxes grey out; re-tick restores prior per-event choices |
 | TC-64 | P1 | Stream PiP | While a peer streams, click a text channel | Stream shrinks to a draggable mini-window over chat; click returns to the stage focused on it; ✕ hides it until the stream changes; ends when the stream stops |
+| TC-65 | P1 | Self badge sync | Start/stop a share; mute/unmute; deafen | Your OWN rail badges (🖥/🔇/⛔) change instantly on every toggle — no lingering stream icon after Stop |

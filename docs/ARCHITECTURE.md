@@ -393,3 +393,12 @@ focused (else first) screen tile's MediaStream — muted, since audio already
 flows through the audio sink. Click returns to the stage focused on that
 stream; ✕ dismisses until the stream changes; it follows stream start/stop
 while you read.
+
+### Self-state mirror fix (v0.7.1)
+
+The server relays `peer:state` with `socket.to(room)`, which excludes the
+sender — so a client's OWN rail badges (🖥 stream, 🔇 mute, ⛔ deafen) rendered
+from a stale local cache and could linger after the state changed (e.g. the
+stream icon surviving a share stop). `broadcastState` now mirrors the snapshot
+into the sender's own cached peer entry and refreshes the rail immediately;
+self-state never depends on a round trip that doesn't include you.
