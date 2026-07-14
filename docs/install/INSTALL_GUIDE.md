@@ -1,5 +1,7 @@
 # Hearth — Complete Installation Guide
 
+> **Audience:** everyone (client) · host (server section) · **Prerequisites:** client: none · server: basic command line · **Time:** client ~10 min · server ~30 min · **Applies to:** v0.6.x
+
 This is the one-stop guide to getting Hearth running, whichever side of it
 you're on. Hearth has two halves:
 
@@ -16,6 +18,29 @@ address and the app.
 ---
 
 ## Part 1 — The client (everyone)
+
+### Step 0 — Join the group's network first (Tailscale)
+
+**Do this before installing Hearth**, or the app will install fine and then
+refuse to connect — the single most common first-run failure.
+
+Look at the address your host gave you:
+
+- Starts with **`http://100.`** → the group uses **Tailscale**, a free private
+  network. You must join it:
+  1. Ask your host to send you a **Tailscale invite link** to their network.
+  2. Install Tailscale from <https://tailscale.com/download> — it's a normal
+     installer on every OS (Windows/macOS: download and run; Ubuntu/Debian:
+     `curl -fsSL https://tailscale.com/install.sh | sh`; Arch:
+     `sudo pacman -S tailscale`).
+  3. Open the invite link, sign in (Google/Microsoft/GitHub login all work),
+     and accept.
+  4. Make sure Tailscale shows **Connected** (menu-bar/tray icon). Leave it
+     running — it starts with your computer from now on.
+- Starts with **`https://`** (a domain like `hearth.example.com`) → it's a
+  public host; **skip this step entirely.**
+
+**You're done when** the Tailscale icon says Connected. Now install Hearth.
 
 The client is a normal desktop application. Download the installer for your OS
 from the [Releases page](https://github.com/silkhelp-wq/hearth/releases/latest),
@@ -47,8 +72,10 @@ below tell you how to get past it on each platform.
    blue "Windows protected your PC" box. This is because the app isn't signed
    with a paid code-signing certificate — not because anything is wrong.
 3. Click **More info**, then **Run anyway**.
-4. The app installs and launches. On the connect screen, paste the server
-   address your host gave you and enter a display name.
+4. The app installs and launches.
+
+**You're done when** the Hearth window opens asking for a server address —
+paste the one your host gave you and enter a display name.
 
 **Windows pitfalls to watch for:**
 
@@ -82,6 +109,8 @@ below tell you how to get past it on each platform.
    - Alternatively: **System Settings → Privacy & Security**, scroll to the
      "Hearth was blocked" message, and click **Open Anyway**.
 
+**You're done when** the Hearth window opens asking for a server address.
+
 **macOS pitfalls to watch for:**
 
 - **Screen recording permission is mandatory.** The first time you try to
@@ -103,17 +132,25 @@ below tell you how to get past it on each platform.
 ### Linux — AppImage (works on every distro)
 
 The AppImage is the universal option: one self-contained file, no install, no
-package manager.
+package manager — and you can set it up **without touching a terminal**:
 
-1. Download `Hearth-<version>.AppImage`.
-2. Make it executable:
-   ```
-   chmod +x Hearth-<version>.AppImage
-   ```
-3. Run it:
-   ```
-   ./Hearth-<version>.AppImage
-   ```
+**The no-terminal way:**
+1. Download `Hearth-<version>.AppImage` (it lands in your Downloads folder).
+2. In your file manager, **right-click the file → Properties**.
+3. Make it executable: on GNOME/Ubuntu tick **"Allow executing file as
+   program"** (Permissions tab); on KDE tick **"Is executable"**.
+4. Double-click the file. Hearth opens.
+
+**The terminal way** (equivalent — open a terminal with `Ctrl+Alt+T` on most
+distros, or search "Terminal"/"Konsole" in your app menu):
+
+```
+cd ~/Downloads
+chmod +x Hearth-<version>.AppImage
+./Hearth-<version>.AppImage
+```
+
+**You're done when** the Hearth window opens asking for a server address.
 
 **Getting it into your application menu** (so you're not launching from a
 terminal every time) — create a desktop entry:
@@ -234,6 +271,11 @@ to VP8 at 1080p/30 is the practical fix.
 3. Enter a **display name**.
 4. Click connect. You'll land in the lobby with the list of voice and text
    channels on the left.
+
+**If it won't connect:** the overwhelmingly common cause is Step 0 — Tailscale
+isn't installed, isn't running, or you never accepted the tailnet invite.
+Check the Tailscale tray icon says Connected, then try again. Beyond that, see
+[`CONNECTION_GUIDE.md`](../CONNECTION_GUIDE.md).
 
 If you're the **first person ever** to connect and the host tells you to claim
 ownership, they'll give you a **claim code** — paste it into **Settings →

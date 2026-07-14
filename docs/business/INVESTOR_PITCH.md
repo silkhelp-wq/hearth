@@ -1,5 +1,7 @@
 # Hearth — Investor Pitch
 
+> **Audience:** investors & business stakeholders · **Prerequisites:** none · **Time:** 10-minute read · **Applies to:** v0.6.x
+
 **Mages of the Beaches LLC**
 Prepared for investor discussion · v0.6.8 product stage
 

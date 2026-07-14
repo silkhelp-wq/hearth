@@ -1,5 +1,7 @@
 # Hearth — Streaming Internals
 
+> **Audience:** engineers working on media · **Prerequisites:** WebRTC, codecs · **Time:** 15-minute read · **Applies to:** v0.6.x
+
 Everything about how media moves through Hearth: the SFU model, codecs,
 bitrate, the temporal-layer subtleties that caused (and fixed) lag, and the
 hard truth about hardware encoding on Linux/NVIDIA. This is the doc to read

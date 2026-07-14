@@ -1,5 +1,7 @@
 # Hearth — Diagrams
 
+> **Audience:** all technical audiences · **Prerequisites:** none · **Time:** visual reference · **Applies to:** v0.6.x
+
 Visual reference for Hearth's architecture and key flows. These use
 [Mermaid](https://mermaid.js.org/), which GitHub renders natively in Markdown.
 For the authoritative ASCII topology and prose, see

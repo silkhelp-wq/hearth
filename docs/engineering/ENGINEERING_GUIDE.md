@@ -1,5 +1,7 @@
 # Hearth — Engineering Guide
 
+> **Audience:** engineers · **Prerequisites:** Node.js, WebRTC concepts, Electron · **Time:** 25-minute read · **Applies to:** v0.6.x
+
 Deep technical documentation for engineers working on Hearth and testers
 verifying it. Assumes familiarity with WebRTC concepts, Node.js, and Electron.
 For the high-level design narrative, read [`../ARCHITECTURE.md`](../ARCHITECTURE.md)

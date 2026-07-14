@@ -1,5 +1,7 @@
 # Hearth — Test Strategy
 
+> **Audience:** engineers & QA · **Prerequisites:** basic familiarity with the codebase · **Time:** 10-minute read · **Applies to:** v0.6.x
+
 How Hearth is tested, what's automated vs. manual, and how to verify a change
 before shipping it. Pairs with [`../TEST_PLAN.md`](../TEST_PLAN.md), which holds
 the concrete numbered test cases (TC-01…TC-59+). This document is the *approach*;

@@ -1,5 +1,7 @@
 # Hearth — DevOps Deployment Guide
 
+> **Audience:** DevOps / operators · **Prerequisites:** Linux administration, basic networking · **Time:** 20-minute read · **Applies to:** v0.6.x
+
 Running the Hearth server in production: on-premises, on a VPS, or in any cloud.
 This goes well beyond the home-host quick start — it covers networking, TLS,
 process supervision, containers, cloud-specific notes, monitoring, backups, and

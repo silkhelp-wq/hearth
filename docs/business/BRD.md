@@ -1,5 +1,7 @@
 # Hearth — Business Requirements Document (BRD)
 
+> **Audience:** business stakeholders · product · **Prerequisites:** none · **Time:** 10-minute read · **Applies to:** v0.6.x
+
 **Product:** Hearth — self-hosted group communications
 **Owner:** Mages of the Beaches LLC
 **Status:** Reflects v0.6.8 shipping product

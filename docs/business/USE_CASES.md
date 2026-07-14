@@ -1,5 +1,7 @@
 # Hearth — Use Cases
 
+> **Audience:** product · QA · stakeholders · **Prerequisites:** none · **Time:** 10-minute read · **Applies to:** v0.6.x
+
 End-to-end scenarios showing how real people use Hearth. Each case ties a
 business goal to a concrete user flow and references the requirements it
 exercises. Format: actor, goal, preconditions, main flow, alternate/exception
