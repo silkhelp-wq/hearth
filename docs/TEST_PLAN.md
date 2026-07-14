@@ -118,3 +118,14 @@ extract for any failure. File issues with TC ID in the title.
 | TC-38 | Custom emoji | Upload an animated GIF as :party:, type :par → autocomplete, react with it | Animates inline and jumbo when alone; reaction chip shows the image; non-managers see no upload UI |
 | TC-39 | Emoji cap | Set emoji cap to 4 MB, upload past it | Upload refused with a clear message until cap raised or emojis deleted |
 | TC-40 | Live caps | Change chat cap as admin, save | Usage readout refreshes; prune honors new value without restart; non-admins see no Storage section |
+
+| TC-41 | Stream clarity | Watch a fast-motion share as a second user | No trailing/ghosting after the initial keyframe; sender unaffected |
+| TC-42 | Pop-out viewer | Click a stream's ⛶, drag it, resize, fit, fullscreen | Floats and moves; fit snaps inside the stage; fullscreen fills the display; closes when the share stops |
+| TC-43 | Jukebox queue | Queue 3 tracks back-to-back, let them play through | Each advances automatically; none dropped; skip mid-track advances cleanly |
+| TC-44 | Public host | Set HEARTH_ANNOUNCED_IP to a public IP, open ports, connect off-tailnet | Voice/video/screen all connect with no Tailscale |
+
+| TC-45 | Voice bitrate | Set quality to 24 kbps then 510 kbps mid-call | Audio audibly changes; no codec-collision errors; setting persists |
+| TC-46 | Server monitor | Open Settings → Server as owner | CPU/mem/disk/net update live every 2s; live counts match reality; non-admins never see it |
+| TC-47 | Service install | Run install-server.sh, reboot | Server auto-starts with no terminal; data survives; --uninstall keeps a data backup |
+| TC-48 | Native package | makepkg -si on CachyOS, enable the user service | Installs to /opt, runs as service, data in ~/.local/share/hearth |
+| TC-49 | Auto-update | With a token set, publish a newer release, open Settings | App shows update available; Update now downloads+installs+restarts; reinstall leaves no stale files |

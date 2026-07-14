@@ -1,0 +1,47 @@
+# pacman install hooks for hearth-server
+
+_env_template() {
+  cat <<'MSG'
+
+  Hearth server installed to /opt/hearth-server.
+
+  Enable it for your user (starts on login, no terminal):
+    systemctl --user enable --now hearth-server
+
+  For 24/7 (runs without you logged in):
+    sudo loginctl enable-linger "$USER"
+
+  Settings (optional) — create ~/.config/hearth/hearth.env:
+    mkdir -p ~/.config/hearth
+    cat > ~/.config/hearth/hearth.env <<'ENV'
+    # HEARTH_NAME=Hearth
+    # HEARTH_ANNOUNCED_IP=        # your public IP for VPS hosting
+    # HEARTH_TENOR_KEY=
+    # HEARTH_GIPHY_KEY=
+    # HEARTH_IMGUR_CLIENT_ID=
+    ENV
+    systemctl --user restart hearth-server
+
+  Owner claim code (first run):
+    journalctl --user -u hearth-server | grep -i 'claim code'
+
+  Your data (database, emojis, settings) lives in
+    ~/.local/share/hearth/data
+  and is preserved across upgrades and removal.
+
+MSG
+}
+
+post_install() {
+  _env_template
+}
+
+post_upgrade() {
+  echo "  hearth-server upgraded. Restart:  systemctl --user restart hearth-server"
+  echo "  Your data in ~/.local/share/hearth/data was untouched."
+}
+
+post_remove() {
+  echo "  hearth-server removed. Your data is still in ~/.local/share/hearth/data"
+  echo "  (delete it manually if you want a clean slate)."
+}

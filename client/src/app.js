@@ -31,7 +31,7 @@ const DEFAULTS = {
   identity: { token: '' },
   audio: {
     inId: '', outId: '',
-    ec: true, ns: true, agc: true, music: false,
+    ec: true, ns: true, agc: true, music: false, bitrate: 128000,
     mode: 'vad', vadDb: -45,
     ptt: null // {type:'key'|'mouse'|'focus', code, label}
   },
@@ -201,6 +201,7 @@ async function doConnect() {
   try {
     const t0 = performance.now();
     await rtc.connect(url, { token: ensureToken(), name });
+    HearthRTC.audioBitrate = settings.audio.bitrate || 128000;
     if (!rawWired) { wireRaw(); chat.wire(); rawWired = true; }
 
     const hello = await new Promise((resolve, reject) => {
@@ -214,8 +215,6 @@ async function doConnect() {
     if (!hello.ownerClaimed) {
       logLine('> this hall has no owner yet — the claim code is in the server console', 'ok');
     }
-
-    $('server-addr').textContent = url.replace(/^https?:\/\//, '');
 
     setTimeout(() => {
       $('screen-connect').classList.add('hidden');
@@ -700,12 +699,13 @@ async function openSharePicker() {
   codecSel.value = settings.stream.codec;
   $('share-optimize').value = settings.stream.optimize;
 
-  const win = bridge.platform === 'win32';
-  $('share-audio').disabled = !win;
-  $('share-audio').checked = win;
-  $('share-audio-note').textContent = win
-    ? 'captures what Windows is playing'
-    : 'system audio capture is Windows-only for now — your mic still works';
+  const plat = bridge.platform;
+  $('share-audio').disabled = false;
+  $('share-audio').checked = plat === 'win32';
+  $('share-audio-note').textContent =
+    plat === 'win32' ? 'captures what Windows is playing'
+    : plat === 'darwin' ? 'macOS needs a loopback driver (e.g. BlackHole) selected as output'
+    : 'Linux: tick to try the desktop-audio portal; if silent, route audio through a PipeWire virtual mic and pick it as your microphone instead';
 
   $('modal-share').showModal();
 
@@ -765,7 +765,7 @@ async function startShare() {
   settings.stream.optimize = $('share-optimize').value;
   saveSettings();
 
-  const withAudio = $('share-audio').checked && bridge.platform === 'win32';
+  const withAudio = $('share-audio').checked;
   await bridge.chooseShareSource({ id: pickedSource.id, withAudio });
 
   const video = p.width
@@ -788,6 +788,13 @@ async function startShare() {
   state.screenStream = stream;
   const videoTrack = stream.getVideoTracks()[0];
   const audioTrack = stream.getAudioTracks()[0] || null;
+
+  // Requested audio but the OS/portal didn't provide it (common on Linux).
+  if (withAudio && !audioTrack && bridge.platform !== 'win32') {
+    updateEmptyStage('Sharing — but your system didn\u2019t hand over desktop audio. ' +
+      'To share sound on Linux, route it through a PipeWire virtual mic and select ' +
+      'that as your microphone in Settings → Audio.');
+  }
 
   await rtc.produceScreen({
     videoTrack,
@@ -824,20 +831,131 @@ async function stopShare(silent = false) {
 
 const tileKey = (peerId, tag) => `${peerId}:${tag}`;
 
+/* ─────────────────── stream theater / pop-out viewer ────────────────── */
+
+const theater = { key: null, drag: null, resize: null };
+
+function openTheater(peerId, tag, label, stream) {
+  const el = $('theater');
+  theater.key = tileKey(peerId, tag);
+  $('th-title').textContent = label;
+  const v = $('th-video');
+  v.srcObject = stream;
+  v.muted = true; // audio still comes through the voice path, not this element
+  el.classList.remove('hidden');
+  if (el.dataset.mode === 'full') exitFsMode();
+  if (!el.style.width) {                 // first open → sensible float size/pos
+    el.style.width = '480px';
+    el.style.height = '300px';
+    el.style.left = (window.innerWidth - 520) + 'px';
+    el.style.top = '90px';
+  }
+}
+
+function closeTheater() {
+  $('theater').classList.add('hidden');
+  $('th-video').srcObject = null;
+  theater.key = null;
+  if ($('theater').dataset.mode === 'full') exitFsMode();
+}
+
+function setTheaterMode(mode) {
+  const el = $('theater');
+  if (mode === 'fit') {
+    el.dataset.mode = 'fit';
+    el.style.left = el.style.top = el.style.width = el.style.height = '';
+  } else {
+    el.dataset.mode = 'float';
+    if (!el.style.width) {
+      el.style.width = '480px'; el.style.height = '300px';
+      el.style.left = (window.innerWidth - 520) + 'px'; el.style.top = '90px';
+    }
+  }
+}
+
+function toggleFullscreen() {
+  const el = $('theater');
+  if (document.fullscreenElement) { document.exitFullscreen(); return; }
+  el.dataset.prevMode = el.dataset.mode;
+  el.dataset.mode = 'full';
+  el.requestFullscreen?.().catch(() => {});
+}
+
+function exitFsMode() {
+  const el = $('theater');
+  el.dataset.mode = el.dataset.prevMode || 'float';
+}
+
+function wireTheater() {
+  $('th-close').addEventListener('click', closeTheater);
+  $('th-fit').addEventListener('click', () =>
+    setTheaterMode($('theater').dataset.mode === 'fit' ? 'float' : 'fit'));
+  $('th-full').addEventListener('click', toggleFullscreen);
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement) exitFsMode();
+  });
+
+  // Drag by the title bar (float mode only).
+  $('theater').querySelector('.th-bar').addEventListener('mousedown', (e) => {
+    const el = $('theater');
+    if (el.dataset.mode !== 'float' || e.target.closest('.th-btn')) return;
+    const r = el.getBoundingClientRect();
+    theater.drag = { dx: e.clientX - r.left, dy: e.clientY - r.top };
+    e.preventDefault();
+  });
+
+  // Resize from the corner grip (float mode only).
+  $('th-resize').addEventListener('mousedown', (e) => {
+    const el = $('theater');
+    if (el.dataset.mode !== 'float') return;
+    const r = el.getBoundingClientRect();
+    theater.resize = { w: r.width, h: r.height, x: e.clientX, y: e.clientY };
+    e.preventDefault();
+    e.stopPropagation();
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    const el = $('theater');
+    if (theater.drag) {
+      const x = Math.max(0, Math.min(e.clientX - theater.drag.dx, window.innerWidth - 120));
+      const y = Math.max(0, Math.min(e.clientY - theater.drag.dy, window.innerHeight - 40));
+      el.style.left = x + 'px'; el.style.top = y + 'px';
+    } else if (theater.resize) {
+      el.style.width = Math.max(240, theater.resize.w + (e.clientX - theater.resize.x)) + 'px';
+      el.style.height = Math.max(160, theater.resize.h + (e.clientY - theater.resize.y)) + 'px';
+    }
+  });
+  window.addEventListener('mouseup', () => { theater.drag = null; theater.resize = null; });
+}
+
+
 function attachTile(peerId, tag, label, stream, badge = '') {
   removeTile(peerId, tag);
   const node = $('tpl-tile').content.firstElementChild.cloneNode(true);
   node.dataset.key = tileKey(peerId, tag);
   node.dataset.peer = peerId;
+  node.dataset.tag = tag;
   node.querySelector('.who').textContent = label;
   node.querySelector('.badge').textContent = badge;
   node.querySelector('video').srcObject = stream;
+  node.title = 'Click to pop out';
+  node.addEventListener('dblclick', () => openTheater(peerId, tag, label, stream));
+  const expand = document.createElement('button');
+  expand.className = 'tile-expand';
+  expand.textContent = '⛶';
+  expand.title = 'Pop out';
+  expand.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openTheater(peerId, tag, label, stream);
+  });
+  node.appendChild(expand);
   $('tile-grid').appendChild(node);
   updateEmptyStage();
 }
 
 function removeTile(peerId, tag) {
   document.querySelector(`.tile[data-key="${CSS.escape(tileKey(peerId, tag))}"]`)?.remove();
+  if (theater.key === tileKey(peerId, tag)) closeTheater();
   updateEmptyStage();
 }
 
@@ -1256,6 +1374,7 @@ async function renderStoragePanel(bp) {
   const wrap = $('srv-storage-wrap');
   const admin = has(bp, P.ADMINISTRATOR);
   wrap.classList.toggle('hidden', !admin);
+  $('srv-monitor-wrap').classList.toggle('hidden', !admin);
   if (!admin) return;
   try {
     const { settings: st2, usage } = await rtc.request('server:settings:get', {});
@@ -1277,6 +1396,92 @@ async function saveStorage() {
     });
     renderStoragePanel(myBasePerms());
   } catch (err) { alert(err.message); }
+}
+
+/* ─────────────────────── server monitor ─────────────────────────── */
+
+let monitorTimer = null;
+const fmtBytes = (b) => {
+  if (!b) return '0 B';
+  const u = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.min(u.length - 1, Math.floor(Math.log(b) / Math.log(1024)));
+  return `${(b / 1024 ** i).toFixed(i ? 1 : 0)} ${u[i]}`;
+};
+const fmtRate = (bps) => `${fmtBytes(bps)}/s`;
+const fmtUptime = (s) => {
+  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+  return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m`;
+};
+
+async function pollMonitor() {
+  if (!has(myBasePerms(), P.ADMINISTRATOR)) return;
+  try {
+    const s = await rtc.request('server:stats', {});
+    $('monitor-host').textContent =
+      `${s.host.hostname} · ${s.host.platform} · ${s.host.arch} · ${s.host.cores} cores · ` +
+      `host up ${fmtUptime(s.host.uptimeSec)} · Hearth up ${fmtUptime(s.host.procUptimeSec)}`;
+
+    const cpuFill = $('mon-cpu-fill');
+    cpuFill.style.width = `${s.cpu.percent}%`;
+    cpuFill.classList.toggle('hot', s.cpu.percent > 85);
+    $('mon-cpu-val').textContent = `${s.cpu.percent}% · load ${s.cpu.load1.toFixed(2)}`;
+
+    const memPct = Math.round((s.memory.used / s.memory.total) * 100);
+    $('mon-mem-fill').style.width = `${memPct}%`;
+    $('mon-mem-val').textContent =
+      `${memPct}% · ${fmtBytes(s.memory.used)} / ${fmtBytes(s.memory.total)} · Hearth ${fmtBytes(s.process.rss)}`;
+
+    const diskPct = s.disk.total ? Math.round((s.disk.used / s.disk.total) * 100) : 0;
+    $('mon-disk-fill').style.width = `${diskPct}%`;
+    $('mon-disk-val').textContent = s.disk.total
+      ? `${diskPct}% · ${fmtBytes(s.disk.free)} free of ${fmtBytes(s.disk.total)}`
+      : 'unavailable';
+
+    $('mon-net-val').innerHTML =
+      `↓ ${fmtRate(s.network.rxBps)}<br>↑ ${fmtRate(s.network.txBps)}`;
+    $('mon-live-val').textContent =
+      `${s.live.online}/${s.live.users} online · ${s.live.voice} in voice · ` +
+      `${s.live.rooms} rooms · ${s.live.producers} streams` +
+      (s.live.jukeboxes ? ` · ${s.live.jukeboxes} 🎵` : '');
+    $('mon-store-val').textContent =
+      `chat ${fmtBytes(s.storage.chatBytes)} · emoji ${fmtBytes(s.storage.emojiBytes)} · ` +
+      `previews ${fmtBytes(s.storage.previewBytes)}`;
+  } catch { /* transient / lost admin */ }
+}
+
+function startMonitor() {
+  stopMonitor();
+  if (!has(myBasePerms(), P.ADMINISTRATOR)) return;
+  pollMonitor();
+  monitorTimer = setInterval(pollMonitor, 2000);
+}
+function stopMonitor() {
+  clearInterval(monitorTimer);
+  monitorTimer = null;
+}
+
+async function checkServerUpdate() {
+  const status = $('server-update-status');
+  const btn = $('btn-server-update-check');
+  btn.disabled = true;
+  status.textContent = 'checking…';
+  try {
+    const res = await rtc.request('server:update:check', {});
+    if (res.available) {
+      status.textContent = `server update available: ${res.latest} (running v${res.current}) — ` +
+        `re-run install-server.sh on the host to update (your data is kept)`;
+    } else if (res.error) {
+      status.textContent = `server v${res.current} · check failed: ${res.error}`;
+    } else if (res.reason) {
+      status.textContent = `server v${res.current} (update check not configured on host)`;
+    } else {
+      status.textContent = `server up to date — v${res.current}`;
+    }
+  } catch (err) {
+    status.textContent = `check failed: ${err.message}`;
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 const countBits = (n) => { let c = 0; while (n) { c += n & 1; n >>>= 1; } return c; };
@@ -1402,6 +1607,7 @@ function fillSettingsForm() {
   $('set-ns').checked = settings.audio.ns;
   $('set-agc').checked = settings.audio.agc;
   $('set-music').checked = settings.audio.music;
+  $('set-audio-bitrate').value = String(settings.audio.bitrate || 128000);
   $('set-vad').checked = settings.audio.mode === 'vad';
   $('set-ptt').checked = settings.audio.mode === 'ptt';
   $('set-vad-th').value = settings.audio.vadDb;
@@ -1480,7 +1686,9 @@ async function onAudioSettingsChanged() {
   settings.audio.ns = $('set-ns').checked;
   settings.audio.agc = $('set-agc').checked;
   settings.audio.music = $('set-music').checked;
+  settings.audio.bitrate = Number($('set-audio-bitrate').value) || 128000;
   saveSettings();
+  await rtc.setAudioBitrate(settings.audio.bitrate);
   if (state.micStream || rtc.joined) await startMic();
 }
 
@@ -1986,6 +2194,7 @@ function wire() {
   // settings modal
   $('btn-settings-close').addEventListener('click', () => {
     if (state.micTestEl) toggleMicTest();
+    stopMonitor();
     $('modal-settings').close();
   });
   document.querySelectorAll('.tab').forEach((tab) =>
@@ -1993,9 +2202,15 @@ function wire() {
       document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t === tab));
       document.querySelectorAll('.tab-panel').forEach((p) =>
         p.classList.toggle('hidden', p.dataset.panel !== tab.dataset.tab));
+      if (tab.dataset.tab === 'server') startMonitor();
+      else stopMonitor();
     }));
+  $('btn-monitor-refresh').addEventListener('click', () => pollMonitor());
+  $('btn-server-update-check').addEventListener('click', () => checkServerUpdate());
+  $('btn-check-update').addEventListener('click', () => checkUpdate(false));
+  $('btn-do-update').addEventListener('click', () => doUpdate());
 
-  for (const id of ['set-mic', 'set-ec', 'set-ns', 'set-agc', 'set-music']) {
+  for (const id of ['set-mic', 'set-ec', 'set-ns', 'set-agc', 'set-music', 'set-audio-bitrate']) {
     $(id).addEventListener('change', () => onAudioSettingsChanged().catch(console.error));
   }
   $('set-out').addEventListener('change', () => {
@@ -2050,10 +2265,72 @@ function wire() {
     }
   });
 
+  wireTheater();
   statsLoop();
 }
 
 const isTyping = (e) =>
   ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target?.tagName);
 
+/* ─────────────────────────── auto-update ────────────────────────────── */
+
+let pendingUpdate = null;
+
+async function initUpdates() {
+  if (!bridge.appVersion) return; // web / non-electron
+  try {
+    const v = await bridge.appVersion();
+    $('update-version').textContent = `v${v}`;
+  } catch { /* ignore */ }
+  bridge.onUpdateProgress?.((pct) => {
+    $('update-status').textContent = `downloading… ${pct}%`;
+  });
+  // Quiet check shortly after launch.
+  setTimeout(() => checkUpdate(true), 4000);
+}
+
+async function checkUpdate(quiet = false) {
+  if (!bridge.checkUpdate) return;
+  const status = $('update-status');
+  const btn = $('btn-check-update');
+  if (!quiet) { btn.disabled = true; status.textContent = 'checking…'; }
+  try {
+    const res = await bridge.checkUpdate();
+    if (res.available) {
+      pendingUpdate = res;
+      status.textContent = `update available: ${res.latest} (you have v${res.current})`;
+      $('btn-do-update').classList.toggle('hidden', !res.assetId);
+      if (!res.assetId) status.textContent += ' — open Releases to download';
+    } else if (res.error) {
+      if (!quiet) status.textContent = `check failed: ${res.error}`;
+    } else if (res.reason) {
+      if (!quiet) status.textContent = `Hearth v${await bridge.appVersion()} (auto-update not configured)`;
+    } else {
+      if (!quiet) status.textContent = `up to date — v${res.current}`;
+    }
+  } catch (err) {
+    if (!quiet) status.textContent = `check failed: ${err.message}`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function doUpdate() {
+  if (!pendingUpdate?.assetId) return;
+  const btn = $('btn-do-update');
+  btn.disabled = true;
+  $('update-status').textContent = 'downloading…';
+  try {
+    const dl = await bridge.downloadUpdate(pendingUpdate.assetId, pendingUpdate.assetName);
+    if (!dl.ok) throw new Error(dl.error);
+    $('update-status').textContent = 'installing — Hearth will restart…';
+    await bridge.installUpdate(dl.file);
+  } catch (err) {
+    $('update-status').textContent = `update failed: ${err.message}`;
+    btn.disabled = false;
+  }
+}
+
 wire();
+
+initUpdates();

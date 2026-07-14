@@ -24,6 +24,8 @@ const chat = require('./chat');
 const unfurl = require('./unfurl');
 const jukebox = require('./jukebox');
 const gifs = require('./gifs');
+const monitor = require('./monitor');
+const selfupdate = require('./selfupdate');
 const { P, ALL, has } = require('./perms');
 
 const SELFTEST = process.argv.includes('--selftest');
@@ -387,6 +389,28 @@ async function main() {
       console.log(`[settings] storage caps → chat ${settings.chatCapMB}MB, ` +
         `emoji ${settings.emojiCapMB}MB, previews ${settings.previewCapMB}MB (by ${user.name})`);
       return { settings };
+    }));
+
+    socket.on('server:stats', guarded(async () => {
+      needAdmin();
+      return monitor.snapshot({
+        dataDir: config.dataDir,
+        storage: {
+          chatBytes: db.dbSizeBytes(),
+          emojiBytes: db.emojiTotalBytes(),
+          previewBytes: db.previewCacheBytes()
+        },
+        live: {
+          users: db.listUsers().length,
+          online: online.size,
+          ...room.liveStats()
+        }
+      });
+    }));
+
+    socket.on('server:update:check', guarded(async () => {
+      needAdmin();
+      return selfupdate.checkForUpdate();
     }));
 
     socket.on('disconnect', () => {

@@ -371,10 +371,24 @@ function attachSocket(io, socket) {
     };
   }));
 
+  socket.on('consumer:keyframe', guarded(async ({ consumerId }) => {
+    const consumer = currentPeer()?.consumers.get(consumerId);
+    if (!consumer || consumer.kind !== 'video') return { ok: false };
+    try { await consumer.requestKeyFrame(); } catch { /* non-fatal */ }
+    return { ok: true };
+  }));
+
   socket.on('consumer:resume', guarded(async ({ consumerId }) => {
     const consumer = currentPeer()?.consumers.get(consumerId);
     if (!consumer) throw new Error('unknown consumer');
     await consumer.resume();
+    // Force a fresh keyframe on resume. Without this the viewer starts
+    // mid-GOP on a P-frame that references frames it never received,
+    // producing the "ghosting / trailing" artifacts the SENDER never sees
+    // (they render their own capture locally). Video only.
+    if (consumer.kind === 'video') {
+      try { await consumer.requestKeyFrame(); } catch { /* non-fatal */ }
+    }
     return { ok: true };
   }));
 
@@ -497,7 +511,18 @@ function attachSocket(io, socket) {
   socket.on('disconnect', () => leaveVoice(io, socket));
 }
 
+/** Live media counts for the owner dashboard. */
+function liveStats() {
+  let voice = 0, producers = 0, jukeboxes = 0;
+  for (const room of rooms.values()) {
+    voice += room.peers.size;
+    for (const peer of room.peers.values()) producers += peer.producers.size;
+    if (room.jukebox?.producer) { producers += 1; jukeboxes += 1; }
+  }
+  return { voice, rooms: rooms.size, producers, jukeboxes };
+}
+
 module.exports = {
   attachSocket, publicDirectory, directoryFor,
-  dirDirty, syncTextRooms, leaveVoice, serverMuted
+  dirDirty, syncTextRooms, leaveVoice, serverMuted, liveStats
 };

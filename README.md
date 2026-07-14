@@ -38,6 +38,19 @@ rides on your [Tailscale](https://tailscale.com) tailnet.
   `:name:` in messages (with autocomplete) and as reactions, Discord-style
 - **Live storage caps** — the owner tunes chat history, emoji storage, and
   preview-cache sizes from Settings → Server, with usage readouts
+- **Pop-out stream viewer** (v0.5) — click any video to a draggable, resizable
+  floating window, fit-to-Hearth, or fullscreen, Discord-style
+- **Runs on Tailscale *or* a public VPS** — no code change; see
+  `docs/DEPLOY_PUBLIC.md`
+- **Adjustable voice quality** (v0.6) — Opus bitrate from efficient 24 kbps
+  up to transparent 510 kbps, live
+- **Owner server monitor** — CPU, memory, disk, network throughput, live
+  Hearth stats, and storage breakdown in Settings → Server
+- **Native install & background service** — CachyOS/Arch package or install
+  script; runs as a systemd user service, no terminal to keep open
+- **In-app auto-update** — checks the (private) repo's Releases and updates
+  itself; clean reinstall leaves nothing stale behind. See
+  `docs/INSTALL_NATIVE.md`
 - **Cross-platform**: Linux, Windows, macOS (Electron)
 
 ## Quick start (host, ~5 minutes)

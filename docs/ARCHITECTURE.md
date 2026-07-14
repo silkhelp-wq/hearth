@@ -227,3 +227,59 @@ store `ce:<id>` tokens next to unicode ones.
 table (env values are just defaults), editable by Administrators in
 Settings → Server with live usage readouts; the prune loop and the emoji
 upload gate read the current values every pass.
+
+### Video quality, pop-out viewer, public hosting (v0.5)
+
+**Ghosting fix:** viewers decode the *transmitted* stream (the sender renders
+their own capture locally, which is why only viewers saw trailing artifacts).
+The SFU now calls `consumer.requestKeyFrame()` on every video consumer resume,
+and clients re-request a keyframe shortly after attaching a track and expose
+`consumer:keyframe` for stall recovery. Screen producers declare
+`scalabilityMode: L1T3` for an explicit temporal structure and set
+`degradationPreference` (maintain-resolution for text, balanced for motion).
+
+**Pop-out viewer:** a floating theater element (drag by title bar, resize from
+the grip, fit-inside-stage, or native fullscreen); audio stays on the voice
+path, the element is muted. It keys off `peer:tag` so it auto-closes when that
+stream ends.
+
+**Public hosting:** `HEARTH_ANNOUNCED_IP` already lets mediasoup advertise a
+reachable public address, so a VPS deployment needs only that env var and two
+open ports — no Tailscale required. Full guide in `DEPLOY_PUBLIC.md`.
+
+**Jukebox robustness:** the queue advance is now serialized behind an
+`advancing` flag with a per-pipeline token, eliminating a double-advance race
+where a track ending while another was queued could silently drop one (the
+"have to empty the queue to recover" bug).
+
+**Share audio:** the system-audio toggle is enabled on all platforms and
+honored via getDisplayMedia; on Linux, where Chromium/Wayland can't capture
+desktop audio directly, the UI points to the PipeWire virtual-mic route rather
+than silently producing no sound.
+
+### Audio quality, monitoring, packaging, auto-update (v0.6)
+
+**Voice bitrate:** Opus is already the crispest WebRTC codec; the lever is
+bitrate. `HearthRTC.audioBitrate` (16k–510k) feeds every audio producer's
+`opusMaxAverageBitrate` and encoding `maxBitrate`, kept identical across
+producers on a transport to avoid the fmtp-collision class of bug. Changing
+it live re-applies via `setParameters` and restarts the mic producer.
+
+**Server monitor:** `monitor.js` samples CPU (os.cpus() deltas), memory,
+disk (statfs on the data volume), and network throughput (/proc/net/dev
+deltas on Linux). `server:stats` (admin-gated) returns that plus live media
+counts from `room.liveStats()`; the client polls every 2s only while the
+Server tab is open.
+
+**Native packaging:** the desktop app builds AppImage + deb + **pacman**
+(CachyOS/Arch) + exe + dmg. The server ships a PKGBUILD and an
+`install-server.sh` that register a **systemd user service** (auto-start,
+Restart=on-failure) and preserve `data/` across updates. Reinstalls wipe
+program files first, so nothing stale remains.
+
+**Auto-update (private repo):** both app and server read a read-only,
+single-repo GitHub token (git-ignored, injected at build time) and poll the
+Releases API. The app downloads the matching platform asset (AppImage
+self-replaces; others hand off to the OS installer) and restarts; the server
+reports availability and is updated by re-running its installer. No token →
+feature silently disabled, app still works.

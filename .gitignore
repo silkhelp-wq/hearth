@@ -6,3 +6,8 @@ release/
 
 # chat database and runtime state
 server/data/
+**/update-token.txt
+**/hearth-update-token.txt
+server/packaging/pkg/
+server/packaging/*.pkg.tar.zst
+server/packaging/src/

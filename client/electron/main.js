@@ -11,6 +11,7 @@
 
 const { app, BrowserWindow, ipcMain, session, desktopCapturer } = require('electron');
 const path = require('path');
+const updater = require('./updater');
 
 // Wayland: route getDisplayMedia through the xdg-desktop-portal / PipeWire.
 // AcceleratedVideoEncoder: opt into VA-API hardware encode on Linux where
@@ -108,7 +109,7 @@ function createWindow() {
     height: 860,
     minWidth: 960,
     minHeight: 620,
-    backgroundColor: '#17130f',
+    backgroundColor: '#0d1210',
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -198,6 +199,23 @@ app.whenReady().then(() => {
       captureResolve = resolve;
       setTimeout(() => finishCapture(null), 10_000); // give up after 10s
     });
+  });
+
+  ipcMain.handle('app:version', () => app.getVersion());
+  ipcMain.handle('update:check', async () => {
+    try { return await updater.checkForUpdate(); }
+    catch (err) { return { available: false, error: err.message }; }
+  });
+  ipcMain.handle('update:download', async (_e, { assetId, assetName }) => {
+    try {
+      const file = await updater.downloadAsset(assetId, assetName,
+        (pct) => win?.webContents.send('update:progress', pct));
+      return { ok: true, file };
+    } catch (err) { return { ok: false, error: err.message }; }
+  });
+  ipcMain.handle('update:install', async (_e, file) => {
+    try { await updater.installUpdate(file); return { ok: true }; }
+    catch (err) { return { ok: false, error: err.message }; }
   });
 
   loadUiohook();

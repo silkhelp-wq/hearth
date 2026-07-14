@@ -15,7 +15,7 @@
       <div class="brand">
         <span class="brand-ember" aria-hidden="true"></span>
         <h1>Hearth</h1>
-        <p class="tagline">your crew's own hall — voice · camera · screens · chat</p>
+        <p class="tagline">a hall for your warband — voice · camera · screens · chat</p>
       </div>
 
       <label class="field">
@@ -41,7 +41,6 @@
     <aside id="rail">
       <header class="rail-head">
         <div class="rail-title" id="server-name">Hearth</div>
-        <div class="rail-addr mono" id="server-addr"></div>
       </header>
 
       <div class="rail-scroll">
@@ -149,6 +148,20 @@
 
   <div id="picker-pop" class="picker-pop hidden"></div>
   <div id="emoji-ac" class="emoji-ac hidden"></div>
+
+  <div id="theater" class="theater hidden" data-mode="float">
+    <div class="th-bar">
+      <span id="th-title" class="th-title"></span>
+      <span class="th-spacer"></span>
+      <button id="th-fit" class="th-btn" title="Fit inside Hearth">▣</button>
+      <button id="th-full" class="th-btn" title="Fullscreen">⛶</button>
+      <button id="th-close" class="th-btn" title="Close viewer">✕</button>
+    </div>
+    <div class="th-stage">
+      <video id="th-video" autoplay playsinline></video>
+    </div>
+    <div id="th-resize" class="th-resize" title="Drag to resize"></div>
+  </div>
   <div id="ctx-menu" class="ctx-menu hidden"></div>
 
   <!-- ═══════════════ Create channel ═══════════════ -->
@@ -247,6 +260,12 @@
 
     <!-- Audio -->
     <section class="tab-panel" data-panel="audio">
+      <div id="update-row" class="update-row">
+        <span id="update-status" class="mono small">Hearth <span id="update-version"></span></span>
+        <span class="th-spacer"></span>
+        <button id="btn-check-update" class="btn small">Check for updates</button>
+        <button id="btn-do-update" class="btn small primary hidden">Update now</button>
+      </div>
       <div class="grid-2">
         <label class="field"><span>Microphone</span><select id="set-mic"></select></label>
         <label class="field"><span>Output device</span><select id="set-out"></select></label>
@@ -264,6 +283,16 @@
           <label class="check"><input type="checkbox" id="set-ns" checked /> Noise suppression</label>
           <label class="check"><input type="checkbox" id="set-agc" checked /> Auto gain control</label>
           <label class="check"><input type="checkbox" id="set-music" /> Music mode <em class="hint">stereo, processing off</em></label>
+          <label class="field"><span>Voice quality</span>
+            <select id="set-audio-bitrate">
+              <option value="24000">Efficient — 24 kbps (tight uplink)</option>
+              <option value="48000">Standard — 48 kbps</option>
+              <option value="96000">Clear — 96 kbps</option>
+              <option value="128000">Crisp — 128 kbps (default)</option>
+              <option value="256000">Studio — 256 kbps</option>
+              <option value="510000">Transparent — 510 kbps (max)</option>
+            </select>
+          </label>
         </div>
         <div class="stack">
           <span class="field-label">Activation</span>
@@ -366,6 +395,47 @@
           <span id="emoji-status" class="hint"></span>
         </div>
         <div id="srv-emojis" class="emoji-manager"></div>
+      </div>
+
+      <div id="srv-monitor-wrap" class="srv-section hidden">
+        <div class="rail-label mono">server monitor
+          <button id="btn-monitor-refresh" class="rail-add" title="Refresh now">↻</button>
+        </div>
+        <div id="monitor-host" class="mono small hint"></div>
+        <div id="server-update-row" class="update-row" style="margin:8px 0;">
+          <span id="server-update-status" class="mono small">server version —</span>
+          <span class="th-spacer"></span>
+          <button id="btn-server-update-check" class="btn small">Check server update</button>
+        </div>
+        <div class="monitor-grid">
+          <div class="mon-card">
+            <div class="mon-label">CPU</div>
+            <div class="mon-bar"><div id="mon-cpu-fill" class="mon-fill"></div></div>
+            <div id="mon-cpu-val" class="mon-val mono"></div>
+          </div>
+          <div class="mon-card">
+            <div class="mon-label">Memory</div>
+            <div class="mon-bar"><div id="mon-mem-fill" class="mon-fill"></div></div>
+            <div id="mon-mem-val" class="mon-val mono"></div>
+          </div>
+          <div class="mon-card">
+            <div class="mon-label">Disk (data volume)</div>
+            <div class="mon-bar"><div id="mon-disk-fill" class="mon-fill"></div></div>
+            <div id="mon-disk-val" class="mon-val mono"></div>
+          </div>
+          <div class="mon-card">
+            <div class="mon-label">Network ↓ / ↑</div>
+            <div id="mon-net-val" class="mon-val mono big"></div>
+          </div>
+          <div class="mon-card">
+            <div class="mon-label">Hearth now</div>
+            <div id="mon-live-val" class="mon-val mono"></div>
+          </div>
+          <div class="mon-card">
+            <div class="mon-label">Storage used</div>
+            <div id="mon-store-val" class="mon-val mono"></div>
+          </div>
+        </div>
       </div>
 
       <div id="srv-storage-wrap" class="srv-section hidden">

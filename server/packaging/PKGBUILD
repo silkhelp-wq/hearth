@@ -1,0 +1,67 @@
+# Maintainer: Mages of the Beaches LLC
+# PKGBUILD for the Hearth server on CachyOS / Arch.
+#
+# Build & install natively:
+#   cd server/packaging
+#   makepkg -si
+#
+# This installs the server to /opt/hearth-server, registers a systemd USER
+# service template, and pulls in node/ffmpeg/yt-dlp. After install, each user
+# enables it once:
+#   systemctl --user enable --now hearth-server
+#
+# Your data lives in ~/.local/share/hearth/data and is never touched by
+# package upgrades or removal.
+
+pkgname=hearth-server
+pkgver=0.6.0
+pkgrel=1
+pkgdesc="Self-hosted voice/video/chat server (Hearth)"
+arch=('x86_64')
+url="https://github.com/silkhelp-wq/hearth"
+license=('MIT')
+depends=('nodejs>=22' 'npm')
+optdepends=('ffmpeg: jukebox audio streaming'
+            'yt-dlp: jukebox track resolution')
+options=('!strip')
+install=hearth-server.install
+# Sources are provided locally by the build (copied from the repo), so no
+# source array / checksums — build from the working tree.
+
+package() {
+  local dest="$pkgdir/opt/hearth-server"
+  install -dm755 "$dest"
+
+  # Copy server sources from two levels up (server/), excluding data/node_modules.
+  cp -a "$startdir/../src" "$dest/"
+  install -Dm644 "$startdir/../package.json" "$dest/package.json"
+  [ -f "$startdir/../channels.json" ] && install -Dm644 "$startdir/../channels.json" "$dest/channels.json"
+
+  # Production deps installed into the package tree.
+  ( cd "$dest" && npm install --omit=dev --no-audit --no-fund >/dev/null 2>&1 || true )
+  ( cd "$dest" && npm install-scripts approve mediasoup better-sqlite3 >/dev/null 2>&1 || true )
+  ( cd "$dest" && npm rebuild mediasoup better-sqlite3 >/dev/null 2>&1 || true )
+
+  # systemd USER service — data + env live under the user's home.
+  install -dm755 "$pkgdir/usr/lib/systemd/user"
+  cat > "$pkgdir/usr/lib/systemd/user/hearth-server.service" <<'EOF'
+[Unit]
+Description=Hearth voice/chat server
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/hearth-server
+Environment=HEARTH_DATA_DIR=%h/.local/share/hearth/data
+EnvironmentFile=-%h/.config/hearth/hearth.env
+ExecStartPre=/usr/bin/mkdir -p %h/.local/share/hearth/data
+ExecStart=/usr/bin/node /opt/hearth-server/src/index.js
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target
+EOF
+
+  install -Dm644 "$startdir/../../README.md" "$pkgdir/usr/share/doc/hearth-server/README.md" 2>/dev/null || true
+}

@@ -1,26 +1,37 @@
 /* ══════════════════════════════════════════════════════════════════
-   Hearth — guild hall at night.
-   Ink & parchment surfaces, steel for interaction, ember strictly for
-   "live audio/video" state. Mono face carries data (addresses, stats).
+   Hearth — the Dark Portal theme (WoW: Burning Crusade).
+   Outland stone surfaces under fel-green light. Fel is the "live /
+   interactive" accent; arcane purple is secondary flare; aged gold
+   carries titles and text. Engraved serif for headings, clean sans for
+   body so it stays sharp and readable.
    ══════════════════════════════════════════════════════════════════ */
 
 :root {
-  --ink: #17130f;
-  --panel: #201a14;
-  --panel-2: #282017;
-  --seam: #352b22;
-  --parchment: #e8dfd2;
-  --ash: #9a8e7e;
-  --ember: #f59e4a;
-  --ember-deep: #c96f1f;
-  --steel: #7fa3b8;
-  --danger: #e0644f;
+  --ink: #0d1210;          /* deep Outland shadow, faint green cast */
+  --panel: #141b17;        /* fel-lit stone */
+  --panel-2: #1b241e;      /* raised stone */
+  --seam: #2c3a2e;         /* mossed edges */
+  --parchment: #e6dcc0;    /* aged gold-parchment text */
+  --ash: #8fa08a;          /* muted fel-lichen grey-green */
+
+  --fel: #7ac943;          /* fel green — primary interaction/live */
+  --fel-bright: #a6ff5e;   /* corrupted glow highlight */
+  --fel-deep: #4e8b2a;     /* deep fel */
+  --arcane: #b389f0;       /* arcane/void purple — secondary accent */
+  --gold: #d9b45a;         /* weathered bronze-gold — titles */
+  --danger: #e0644f;       /* blood/warning */
+
+  /* legacy aliases so existing rules keep working, remapped to TBC */
+  --ember: var(--fel);
+  --ember-deep: var(--fel-deep);
+  --steel: var(--arcane);
 
   --font-ui: system-ui, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-display: "Cinzel", "Trajan Pro", "Times New Roman", Georgia, serif;
   --font-mono: ui-monospace, "Cascadia Code", "SF Mono", "JetBrains Mono", Menlo, monospace;
 
-  --radius: 10px;
-  --ring: 0 0 0 2px var(--ink), 0 0 0 4px var(--ember), 0 0 18px 2px rgba(245, 158, 74, 0.45);
+  --radius: 8px;
+  --ring: 0 0 0 2px var(--ink), 0 0 0 4px var(--fel), 0 0 20px 3px rgba(122, 201, 67, 0.55);
 }
 
 * { box-sizing: border-box; }
@@ -28,7 +39,9 @@
 html, body {
   height: 100%;
   margin: 0;
-  background: var(--ink);
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(122, 201, 67, 0.06), transparent 60%),
+    var(--ink);
   color: var(--parchment);
   font-family: var(--font-ui);
   font-size: 15px;
@@ -40,8 +53,14 @@ html, body {
 .small { font-size: 12px; }
 .hint { display: block; color: var(--ash); font-style: normal; font-size: 12px; }
 
+/* Engraved headings across the app. */
+h1, h2, h3, .rail-title, .th-title {
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+}
+
 :focus-visible {
-  outline: 2px solid var(--steel);
+  outline: 2px solid var(--fel);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -57,8 +76,8 @@ html, body {
   padding: 9px 16px;
   cursor: pointer;
 }
-.btn:hover { border-color: var(--steel); }
-.btn.primary { background: var(--steel); border-color: var(--steel); color: #10161a; font-weight: 600; }
+.btn:hover { border-color: var(--fel); }
+.btn.primary { background: var(--fel); border-color: var(--fel-deep); color: #0b1408; font-weight: 700; box-shadow: 0 0 12px rgba(122, 201, 67, 0.35); }
 .btn.primary:hover { filter: brightness(1.08); }
 .btn.small { padding: 5px 10px; font-size: 13px; border-radius: 7px; }
 .btn.wide { width: 100%; }
@@ -126,17 +145,19 @@ input[type="range"] { accent-color: var(--steel); width: 180px; }
 .brand { text-align: center; margin-bottom: 18px; }
 .brand h1 {
   margin: 8px 0 2px;
-  font-size: 30px;
-  letter-spacing: 0.02em;
+  font-size: 32px;
+  letter-spacing: 0.06em;
+  color: var(--gold);
+  text-shadow: 0 0 14px rgba(122, 201, 67, 0.35), 0 1px 0 #000;
 }
 .tagline { margin: 0; color: var(--ash); font-size: 13px; }
 
 .brand-ember {
   display: inline-block;
-  width: 14px; height: 14px;
+  width: 16px; height: 16px;
   border-radius: 50%;
-  background: var(--ember);
-  box-shadow: 0 0 18px 4px rgba(245, 158, 74, 0.55);
+  background: radial-gradient(circle at 40% 35%, var(--fel-bright), var(--fel) 55%, var(--fel-deep) 100%);
+  box-shadow: 0 0 20px 5px rgba(122, 201, 67, 0.6);
   animation: breathe 3.2s ease-in-out infinite;
 }
 @keyframes breathe {
@@ -177,7 +198,6 @@ input[type="range"] { accent-color: var(--steel); width: 180px; }
 
 .rail-head { padding: 16px 16px 12px; border-bottom: 1px solid var(--seam); }
 .rail-title { font-weight: 700; font-size: 17px; }
-.rail-addr { color: var(--ash); font-size: 11.5px; margin-top: 2px; }
 
 .rail-label {
   padding: 14px 16px 6px;
@@ -205,7 +225,7 @@ input[type="range"] { accent-color: var(--steel); width: 180px; }
 }
 .channel.occupied .occ {
   background: var(--ember);
-  box-shadow: 0 0 7px 1px rgba(245, 158, 74, 0.6);
+  box-shadow: 0 0 7px 1px rgba(122, 201, 67, 0.65);
 }
 .channel-peers { margin: 4px 0 2px 15px; display: flex; flex-direction: column; gap: 2px; }
 
@@ -220,7 +240,7 @@ input[type="range"] { accent-color: var(--steel); width: 180px; }
   transition: box-shadow 120ms ease;
 }
 .rail-peer.speaking { color: var(--parchment); }
-.rail-peer.speaking .dot { background: var(--ember); box-shadow: 0 0 8px 2px rgba(245, 158, 74, 0.65); }
+.rail-peer.speaking .dot { background: var(--ember); box-shadow: 0 0 8px 2px rgba(122, 201, 67, 0.7); }
 .rail-peer .flags { margin-left: auto; font-size: 11px; color: var(--ash); }
 .rail-peer input[type="range"] { width: 64px; height: 10px; display: none; }
 .rail-peer:hover input[type="range"] { display: inline-block; }
@@ -238,7 +258,7 @@ input[type="range"] { accent-color: var(--steel); width: 180px; }
   background: var(--seam); flex: none;
   transition: box-shadow 100ms ease, background 100ms ease;
 }
-.self-dot.speaking { background: var(--ember); box-shadow: 0 0 9px 2px rgba(245, 158, 74, 0.7); }
+.self-dot.speaking { background: var(--ember); box-shadow: 0 0 9px 2px rgba(122, 201, 67, 0.75); }
 .self-actions { display: flex; }
 
 /* ── stage ────────────────────────────────────────────────────────── */
@@ -519,10 +539,10 @@ input[type="range"] { accent-color: var(--steel); width: 180px; }
   padding: 1px 5px; font-family: var(--font-mono); font-size: 12.5px;
 }
 .mention {
-  background: rgba(127, 163, 184, 0.18); color: var(--steel);
+  background: rgba(179, 137, 240, 0.18); color: var(--steel);
   border-radius: 4px; padding: 0 3px; font-weight: 600;
 }
-.mention-me { background: rgba(245, 158, 74, 0.22); color: var(--ember); }
+.mention-me { background: rgba(122, 201, 67, 0.24); color: var(--ember); }
 .quote { border-left: 3px solid var(--seam); padding-left: 8px; color: var(--ash); display: inline-block; }
 
 .msg-actions {
@@ -542,7 +562,7 @@ input[type="range"] { accent-color: var(--steel); width: 180px; }
   font-size: 12px; padding: 2px 8px; border-radius: 10px; cursor: pointer;
   background: var(--panel-2); border: 1px solid var(--seam); color: var(--parchment);
 }
-.react-chip.mine { border-color: var(--ember); background: rgba(245, 158, 74, 0.14); }
+.react-chip.mine { border-color: var(--ember); background: rgba(122, 201, 67, 0.16); }
 
 .msg-previews:not(:empty) { padding: 4px 0 2px; }
 .preview-card {
@@ -629,7 +649,7 @@ input[type="range"] { accent-color: var(--steel); width: 180px; }
 
 .flash { animation: msgflash 1.5s ease-out; }
 @keyframes msgflash {
-  0% { background: rgba(245, 158, 74, 0.28); }
+  0% { background: rgba(122, 201, 67, 0.3); }
   100% { background: transparent; }
 }
 
@@ -932,3 +952,106 @@ input[type="range"] { accent-color: var(--steel); width: 180px; }
 .net-row.slim { margin: 4px 0 8px; }
 #emoji-name { width: 240px; padding: 6px 9px; font-size: 12px; background: var(--panel-2); border: 1px solid var(--seam); border-radius: 6px; color: var(--parchment); }
 label.rail-add { display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+
+/* ═══════════════ stream theater / pop-out viewer ═══════════════ */
+
+.tile { position: relative; }
+.tile-expand {
+  position: absolute; top: 6px; right: 6px; z-index: 3;
+  width: 26px; height: 26px; display: none;
+  font-size: 13px; color: var(--parchment); cursor: pointer;
+  background: rgba(13, 18, 16, 0.72); border: 1px solid var(--seam);
+  border-radius: 6px;
+}
+.tile:hover .tile-expand { display: block; }
+.tile-expand:hover { border-color: var(--fel); color: var(--fel-bright); }
+
+.theater {
+  position: fixed; z-index: 80;
+  display: flex; flex-direction: column;
+  background: var(--panel); border: 1px solid var(--fel-deep);
+  border-radius: 10px; overflow: hidden;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(122, 201, 67, 0.15);
+}
+.theater[data-mode="float"] { resize: none; }
+.theater[data-mode="fit"] {
+  left: 264px !important; top: 66px !important;   /* inside the stage, past the rail */
+  right: 12px; bottom: 12px;
+  width: auto !important; height: auto !important;
+  border-radius: 10px;
+}
+.theater[data-mode="full"] {
+  left: 0 !important; top: 0 !important;
+  width: 100vw !important; height: 100vh !important;
+  border-radius: 0; border: none;
+}
+.th-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px; cursor: move;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border-bottom: 1px solid var(--seam);
+}
+.theater[data-mode="fit"] .th-bar,
+.theater[data-mode="float"] .th-bar { cursor: move; }
+.theater[data-mode="full"] .th-bar { cursor: default; }
+.th-title {
+  font-size: 12.5px; color: var(--gold);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%;
+}
+.th-spacer { flex: 1; }
+.th-btn {
+  width: 28px; height: 24px; font-size: 13px; cursor: pointer;
+  background: none; border: 1px solid var(--seam); border-radius: 6px;
+  color: var(--parchment);
+}
+.th-btn:hover { border-color: var(--fel); color: var(--fel-bright); }
+.th-stage {
+  flex: 1; min-height: 0; background: #000;
+  display: flex; align-items: center; justify-content: center;
+}
+.th-stage video { width: 100%; height: 100%; object-fit: contain; }
+.th-resize {
+  position: absolute; right: 0; bottom: 0; width: 18px; height: 18px;
+  cursor: nwse-resize;
+  background: linear-gradient(135deg, transparent 50%, var(--fel-deep) 50%, var(--fel) 100%);
+}
+.theater[data-mode="fit"] .th-resize,
+.theater[data-mode="full"] .th-resize { display: none; }
+
+/* ═══════════════ server monitor dashboard ═══════════════ */
+
+.monitor-grid {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px; margin-top: 6px;
+}
+.mon-card {
+  background: var(--panel-2); border: 1px solid var(--seam);
+  border-radius: 8px; padding: 9px 11px;
+}
+.mon-label {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--ash); margin-bottom: 6px;
+}
+.mon-bar {
+  height: 7px; background: var(--ink); border-radius: 4px;
+  overflow: hidden; margin-bottom: 5px;
+}
+.mon-fill {
+  height: 100%; width: 0;
+  background: linear-gradient(90deg, var(--fel-deep), var(--fel));
+  transition: width 0.4s ease;
+}
+.mon-fill.hot { background: linear-gradient(90deg, #a06a1f, var(--danger)); }
+.mon-val { font-size: 11px; color: var(--parchment); line-height: 1.5; }
+.mon-val.big { font-size: 13px; }
+@media (max-width: 640px) {
+  .monitor-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* update row */
+.update-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; margin-bottom: 12px;
+  background: var(--panel-2); border: 1px solid var(--seam); border-radius: 8px;
+}
+#update-status { color: var(--ash); }

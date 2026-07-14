@@ -1,7 +1,7 @@
 {
   "name": "hearth",
   "productName": "Hearth",
-  "version": "0.4.1",
+  "version": "0.6.0",
   "description": "Self-hosted voice, camera, screen-share, and chat hangout for your crew",
   "homepage": "https://github.com/silkhelp-wq/hearth",
   "license": "MIT",
@@ -49,7 +49,8 @@
     "linux": {
       "target": [
         "AppImage",
-        "deb"
+        "deb",
+        "pacman"
       ],
       "category": "AudioVideo;Network",
       "maintainer": "Mages of the Beaches LLC",
@@ -69,7 +70,34 @@
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false,
+      "menuCategory": true,
+      "runAfterFinish": true
+    },
+    "extraResources": [
+      {
+        "from": "build/update-token.txt",
+        "to": "update-token.txt",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "silkhelp-wq",
+        "repo": "hearth",
+        "private": true,
+        "releaseType": "release"
+      }
+    ],
+    "deb": {
+      "afterRemove": "build/deb-after-remove.sh"
+    },
+    "pacman": {
+      "afterRemove": "build/deb-after-remove.sh"
     }
   }
 }

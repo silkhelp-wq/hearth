@@ -157,20 +157,47 @@ export class HearthRTC extends Emitter {
    * (stereo/128k) on the same transport triggers "codec collision" on PT
    * 111 and kills renegotiation. Stereo+FEC superset, DTX off; music mode
    * differs only in capture constraints (audio.js), never in SDP.
+   *
+   * Bitrate is the one tunable knob — but it MUST stay identical across all
+   * audio producers on this transport, so it lives here as a single value
+   * both mic and screen-audio read. Opus is already the crispest codec
+   * WebRTC offers; higher bitrate (up to 510k) is what buys transparency.
    */
-  static OPUS_AUDIO_OPTIONS = {
-    opusStereo: true,
-    opusFec: true,
-    opusDtx: false,
-    opusMaxAverageBitrate: 128000
-  };
+  static audioBitrate = 128000;
+
+  static opusOptions() {
+    return {
+      opusStereo: true,
+      opusFec: true,
+      opusDtx: false,
+      opusMaxAverageBitrate: HearthRTC.audioBitrate
+    };
+  }
+
+  /** Set the opus target bitrate (bps) and re-apply to any live producers. */
+  async setAudioBitrate(bps) {
+    HearthRTC.audioBitrate = Math.max(16000, Math.min(510000, bps | 0));
+    for (const tag of ['mic', 'screen-audio']) {
+      const producer = this.producers.get(tag);
+      const sender = producer?.rtpSender;
+      if (!sender?.getParameters) continue;
+      try {
+        const params = sender.getParameters();
+        if (params.encodings?.[0]) {
+          params.encodings[0].maxBitrate = HearthRTC.audioBitrate;
+          await sender.setParameters(params);
+        }
+      } catch { /* older browser; takes effect on next produce */ }
+    }
+  }
 
   async produceMic(track, { music = false } = {}) {
     void music; // profile is constant; music mode lives in capture constraints
     const producer = await this.sendTransport.produce({
       track,
       stopTracks: false, // app owns the mic stream (meter, device swaps)
-      codecOptions: { ...HearthRTC.OPUS_AUDIO_OPTIONS },
+      encodings: [{ maxBitrate: HearthRTC.audioBitrate }],
+      codecOptions: { ...HearthRTC.opusOptions() },
       appData: { mediaTag: 'mic' }
     });
     this.producers.set('mic', producer);
@@ -193,17 +220,33 @@ export class HearthRTC extends Emitter {
 
     const video = await this.sendTransport.produce({
       track: videoTrack,
-      encodings: preset?.kbps ? [{ maxBitrate: preset.kbps * 1000 }] : undefined,
-      codecOptions: { videoGoogleStartBitrate: 1500 },
+      encodings: preset?.kbps
+        ? [{ maxBitrate: preset.kbps * 1000, scalabilityMode: 'L1T3' }]
+        : [{ scalabilityMode: 'L1T3' }],
+      codecOptions: {
+        videoGoogleStartBitrate: 1500,
+        // Screen content: shed framerate under pressure, keep pixels sharp.
+        videoGoogleMinBitrate: 300
+      },
       codec: this.#pickCodec(codecPref),
       appData: { mediaTag: 'screen' }
     });
+    // Text/detail content should stay crisp; motion content stays smooth.
+    try {
+      const params = video.rtpSender?.getParameters?.();
+      if (params?.encodings?.[0]) {
+        params.encodings[0].degradationPreference =
+          optimize === 'text' ? 'maintain-resolution' : 'balanced';
+        await video.rtpSender.setParameters(params);
+      }
+    } catch { /* browser without the knob; contentHint already set */ }
     this.producers.set('screen', video);
 
     if (audioTrack) {
       const audio = await this.sendTransport.produce({
         track: audioTrack,
-        codecOptions: { ...HearthRTC.OPUS_AUDIO_OPTIONS },
+        encodings: [{ maxBitrate: HearthRTC.audioBitrate }],
+        codecOptions: { ...HearthRTC.opusOptions() },
         appData: { mediaTag: 'screen-audio' }
       });
       this.producers.set('screen-audio', audio);
@@ -246,6 +289,16 @@ export class HearthRTC extends Emitter {
       track: consumer.track
     });
     await this.request('consumer:resume', { consumerId: consumer.id });
+    // Belt-and-suspenders: server already keyframes on resume, but ask
+    // again once we've wired the track so a clean I-frame is guaranteed.
+    if (kind === 'video') {
+      setTimeout(() => this.requestKeyframe(consumer.id), 300);
+    }
+  }
+
+  /** Ask the SFU to push a fresh keyframe for a video consumer. */
+  requestKeyframe(consumerId) {
+    return this.request('consumer:keyframe', { consumerId }).catch(() => {});
   }
 
   #dropConsumer(consumerId) {

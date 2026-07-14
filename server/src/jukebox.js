@@ -140,6 +140,8 @@ class JukeboxSession {
     this.paused = false;
     this.procs = [];
     this.closed = false;
+    this.advancing = false;
+    this.pipelineToken = null;
   }
 
   peerId() { return `jukebox:${this.channelId}`; }
@@ -232,19 +234,34 @@ class JukeboxSession {
     ff.stdin.on('error', () => {}); // EPIPE when we kill dl first
     this.procs = [dl, ff];
 
+    // Only THIS pipeline's close should advance the queue. A token guards
+    // against a killed/replaced pipeline's late 'close' double-advancing
+    // (the race that silently ate queued tracks).
+    const token = Symbol('pipeline');
+    this.pipelineToken = token;
     ff.on('close', () => {
-      if (this.closed) return;
+      if (this.closed || this.pipelineToken !== token) return;
       this.procs = [];
       this.nowPlaying = null;
-      this.playNext().catch((err) =>
-        console.error('[jukebox] advance failed:', err.message));
+      this.advance();
     });
+  }
+
+  /** Serialized queue advance — never runs twice concurrently. */
+  advance() {
+    if (this.closed || this.advancing) return;
+    this.advancing = true;
+    Promise.resolve()
+      .then(() => this.playNext())
+      .catch((err) => console.error('[jukebox] advance failed:', err.message))
+      .finally(() => { this.advancing = false; });
   }
 
   async playNext() {
     if (this.closed) return;
     const track = this.queue.shift();
     if (!track) {
+      this.nowPlaying = null;
       this.broadcast();
       this.destroy(); // silence → tear down; recreated on next queue
       return;
@@ -256,15 +273,25 @@ class JukeboxSession {
   }
 
   async add(track) {
+    if (this.closed) throw new Error('jukebox session is closing — try again');
     if (this.queue.length >= MAX_QUEUE) throw new Error(`queue is full (${MAX_QUEUE})`);
     this.queue.push(track);
-    if (!this.nowPlaying) await this.playNext();
-    else this.broadcast();
+    // Start playback only if nothing is playing AND nothing is mid-advance.
+    if (!this.nowPlaying && !this.advancing && this.procs.length === 0) {
+      this.advance();
+    } else {
+      this.broadcast();
+    }
   }
 
   skip() {
+    // Invalidate the current pipeline so its 'close' won't advance, then
+    // advance deterministically ourselves.
+    this.pipelineToken = null;
     for (const p of this.procs) { try { p.kill('SIGKILL'); } catch { /* gone */ } }
-    // ffmpeg 'close' advances the queue.
+    this.procs = [];
+    this.nowPlaying = null;
+    this.advance();
   }
 
   setPaused(paused) {
