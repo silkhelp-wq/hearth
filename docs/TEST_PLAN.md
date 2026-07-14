@@ -142,5 +142,3 @@ extract for any failure. File issues with TC ID in the title.
 | TC-56 | Owner reclaim | Run hearth-reclaim-owner on the host, enter the code in-app | Current identity becomes ★ owner; old owner row loses the crown; works regardless of prior token state |
 
 | TC-57 | Stream audio volume | Peer shares a loud game; right-click them | A separate "Stream audio" slider lowers only the game sound, not their voice; present even if their mic is muted |
-
-| TC-58 | Mute/deafen feedback | Click the mic/headphone buttons by your name | Button turns solid red + glow, icon switches to 🔇/🔴; muting actually gates the mic (was working before, just invisible on the dark theme) |
