@@ -28,13 +28,23 @@ app.setPath('userData', path.join(app.getPath('appData'), 'Hearth'));
 // WebRtcAV1HWEncode: hw AV1 encode (NVENC/QSV/AMF) — Chromium ships this
 // OFF by default on Windows, so RTX/Arc/RDNA3 machines would otherwise
 // software-encode AV1 shares.
+// ONE call only. Chromium stores switches in a map, so a second
+// appendSwitch('enable-features', ...) REPLACES the first — it does not
+// merge. A v0.6.8 second call silently wiped this entire list, leaving only
+// a feature name that doesn't exist ('WebRtcHW264Encoding' was invented;
+// hardware H.264 for WebRTC is ON BY DEFAULT and gated by the
+// --disable-webrtc-hw-encoding switch, not an enable-feature).
+//
+// What these actually do:
+//   WebRTCPipeWireCapturer — Wayland screen capture via the portal.
+//   AcceleratedVideoEncoder / VaapiVideoEncoder / VaapiVideoDecoder —
+//     opt into VA-API hardware paths on Linux (Intel/AMD; on NVIDIA the
+//     vaapi driver is decode-only, so encode stays software — see
+//     docs/engineering/STREAMING_INTERNALS.md).
+// Windows (MediaFoundation → NVENC) and macOS (VideoToolbox) need NO flags:
+// their hardware encoders are enabled by default.
 app.commandLine.appendSwitch('enable-features',
-  'WebRTCPipeWireCapturer,AcceleratedVideoEncoder,VaapiVideoEncoder,VaapiVideoDecoder,WebRtcAV1HWEncode');
-// Prefer hardware H.264 in WebRTC where the platform can provide it — on
-// NVIDIA/Linux this is the codec most likely to reach a hardware encoder,
-// since VP9/AV1 hardware encode via Chromium's VA-API path is effectively
-// unavailable there (NVENC isn't exposed to Chromium's encoder).
-app.commandLine.appendSwitch('enable-features', 'WebRtcHW264Encoding');
+  'WebRTCPipeWireCapturer,AcceleratedVideoEncoder,VaapiVideoEncoder,VaapiVideoDecoder');
 // Chromium's Vulkan path conflicts with ozone-wayland ('not compatible with
 // Vulkan' spam) and buys nothing on the NVIDIA GL stack — force it off.
 if (process.platform === 'linux') {

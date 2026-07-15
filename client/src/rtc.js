@@ -366,6 +366,9 @@ export class HearthRTC extends Emitter {
     return {
       codec,
       encoder: outbound.encoderImplementation || '?',
+      // Standardised HW signal (W3C webrtc-stats). Undefined on older stacks,
+      // in which case the UI falls back to name-matching the implementation.
+      powerEfficient: outbound.powerEfficientEncoder,
       fps: Math.round(outbound.framesPerSecond || 0),
       width: outbound.frameWidth || 0,
       height: outbound.frameHeight || 0,

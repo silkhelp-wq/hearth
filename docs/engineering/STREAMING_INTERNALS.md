@@ -168,6 +168,62 @@ to a viewer):**
 
 ---
 
+## 5b. Platform × GPU hardware-encode matrix
+
+**The single most important fact: H.264 is the only codec with broad hardware
+support.** Everything else is a patchwork.
+
+| OS | GPU | HW encode path | Codecs that actually reach hardware |
+|----|-----|----------------|-------------------------------------|
+| **Windows** | NVIDIA Pascal (GTX 10xx) | MediaFoundation → NVENC | **H.264 only** |
+| **Windows** | NVIDIA Turing/Ampere (RTX 20/30) | MediaFoundation → NVENC | H.264 |
+| **Windows** | NVIDIA Ada+ (RTX 40/50) | MediaFoundation → NVENC | H.264, AV1 |
+| **Windows** | Intel (QSV) | MediaFoundation | H.264, often VP9 |
+| **Windows** | AMD (AMF) | MediaFoundation | H.264 |
+| **macOS** | Apple Silicon or Intel | VideoToolbox | H.264 |
+| **Linux** | Intel / AMD | VA-API | H.264, sometimes VP8/VP9 |
+| **Linux** | **NVIDIA** | ✗ none | **none — always software** |
+
+**Windows and macOS need no flags** — their hardware encoders are enabled by
+default. (A `WebRtcHW264Encoding` "feature" does not exist; hardware H.264 is
+on by default and is *disabled* by `--disable-webrtc-hw-encoding`. v0.6.8
+invented that name and, worse, set it in a second
+`appendSwitch('enable-features', …)` call — Chromium stores switches in a map,
+so the second call REPLACED the whole first list. Fixed in v0.9.4: one call,
+real flags only.)
+
+### Why a GTX 1080 Ti shows software encoding
+
+NVENC on **Pascal** encodes H.264 and HEVC — and *nothing else*. It has never
+encoded VP8 or VP9, and AV1 encode needs Ada (RTX 40+). WebRTC doesn't
+negotiate HEVC by default. Therefore:
+
+> On a GTX 1080 Ti, **H.264 is the only codec that can possibly reach NVENC.**
+> With the codec set to "Auto", the negotiation typically lands on VP8/VP9 —
+> which Pascal cannot encode in hardware — so it falls back to software and the
+> stats overlay reads `sw:`. **This is not a bug; it's the wrong codec.**
+
+**Fix: pick H.264 explicitly in the share dialog.** Auto is not your friend if
+you want hardware.
+
+### Reading the encoder honestly
+
+The stats overlay reports the encoder as `hw:` / `sw:` plus its name. As of
+v0.9.4 the hw/sw verdict comes from **`powerEfficientEncoder`** — the
+standardised W3C webrtc-stats boolean that states outright whether the encoder
+is hardware-backed — falling back to name-matching only on stacks that don't
+report it. Previously it relied purely on matching implementation strings,
+which vary by platform and Chromium version and can misreport.
+
+### Recommended settings by crew member
+
+| Their machine | Codec | Expect |
+|---------------|-------|--------|
+| Windows + any modern GPU | **H.264** | `hw:` — smooth, low CPU |
+| macOS (any) | **H.264** | `hw:` via VideoToolbox |
+| Linux + Intel/AMD | **H.264** | usually `hw:` via VA-API |
+| Linux + NVIDIA | **VP8 @ 1080p/30** | `sw:` — pick the cheapest software encode |
+
 ## 6. Ghosting, keyframes, and screen-share correctness
 
 Video ghosting on a viewer (stale frames after resume) is handled by requesting

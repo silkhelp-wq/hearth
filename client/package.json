@@ -1,7 +1,7 @@
 {
   "name": "hearth",
   "productName": "Hearth",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "description": "Self-hosted voice, camera, screen-share, and chat hangout for your crew",
   "homepage": "https://github.com/silkhelp-wq/hearth",
   "license": "MIT",
@@ -57,7 +57,13 @@
     },
     "mac": {
       "target": [
-        "dmg"
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
       ],
       "category": "public.app-category.social-networking",
       "identity": null

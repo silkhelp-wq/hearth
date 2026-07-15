@@ -531,3 +531,50 @@ Note (v0.9.3): the CRLF fix is `.gitattributes` alone — pinning `*.sh` to
 `eol=lf` makes EVERY checkout (including GitHub's Windows runner, which
 defaults to autocrlf=true) produce LF, so the matrix upload is harmless and
 release.yml needs no conditional.
+
+### Cross-platform correctness pass (v0.9.4)
+
+Three real defects found while preparing Windows/macOS testing:
+
+1. **enable-features was being wiped.** v0.6.8 added a SECOND
+   `app.commandLine.appendSwitch('enable-features', 'WebRtcHW264Encoding')`.
+   Chromium keeps switches in a map, so the second call *replaced* the first
+   list — silently dropping WebRTCPipeWireCapturer, AcceleratedVideoEncoder
+   and the VA-API flags. And the surviving name was invented:
+   there is no `WebRtcHW264Encoding` feature (hardware H.264 for WebRTC is ON
+   by default, gated by `--disable-webrtc-hw-encoding`). Now one call, real
+   flags only.
+2. **Hardware detection was string-matching.** The overlay guessed hw/sw by
+   regexing `encoderImplementation`, which varies by platform/version. Now it
+   reads `powerEfficientEncoder` (standardised W3C webrtc-stats boolean) and
+   only falls back to the regex when that's absent.
+3. **Intel Macs got no build at all.** `mac.target` was `["dmg"]` with no
+   arch, and the macos-latest runner is arm64 — so every release shipped
+   arm64-only. Now builds `arm64` + `x64`.
+
+Also documented the platform × GPU hardware matrix: H.264 is the only codec
+with broad hardware support; a GTX 1080 Ti (Pascal) can ONLY reach NVENC via
+H.264 (Pascal never encoded VP8/VP9; AV1 needs Ada), so "Auto" lands on a
+software codec and reads `sw:` — the wrong codec, not a bug.
+
+### v0.9.4 audit results (pre-ship)
+
+A requested deep-dive on the unshipped v0.9.4 found one real bug it had
+introduced and settled the versioning question with evidence:
+
+1. **Mac updater arch bug (introduced by the x64 build fix):** releases now
+   carry TWO dmgs, and `assetForPlatform` returned the first `.dmg` match —
+   an Apple Silicon Mac could self-update onto the Intel build or vice versa.
+   Now filters dmgs and picks by `process.arch`, falling back to the other
+   arch rather than nothing.
+2. **Four-part versions are impossible with this toolchain — proven, not
+   assumed.** A real `electron-builder --linux AppImage` run with version
+   `0.9.4.1` fails immediately: `Invalid version: "0.9.4.1"` (its
+   normalizePackageData hard-validates semver). npm itself tolerates the
+   version, which would have made this a surprise at release time. Policy
+   adopted instead: `0.MINOR.PATCH` with unbounded components (0.9.x fixes,
+   0.10/0.11/… features, 1.0.0 only by decision). Both updaters' parsers were
+   still widened to accept 1–4 components with zero-padded comparison.
+3. Everything else checked clean: uiohook-napi ships darwin-x64 prebuilds (the
+   Intel dmg gets working PTT), one `enable-features` call remains, single
+   shortEncoder call site updated, doc tables intact.

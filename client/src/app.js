@@ -1848,7 +1848,7 @@ function statsLoop() {
       const s = await rtc.producerStats(tag);
       if (s) {
         tile.textContent =
-          `${s.codec} ${s.width}x${s.height}@${s.fps}\n${fmtKbps(s.kbps)} · ${shortEncoder(s.encoder)}`;
+          `${s.codec} ${s.width}x${s.height}@${s.fps}\n${fmtKbps(s.kbps)} · ${shortEncoder(s.encoder, s.powerEfficient)}`;
         tile.classList.remove('hidden');
       }
     }
@@ -2131,9 +2131,13 @@ function applyReco() {
 }
 
 /** "libaom" → "sw:libaom" · "MediaFoundationVideoEncodeAccelerator" → "hw:MediaFoundation" */
-const shortEncoder = (e) => {
+const shortEncoder = (e, powerEfficient) => {
   if (!e || e === '?') return '';
-  const hw = /MediaFoundation|VideoToolbox|Vaapi|V4L2|NVENC|AMF/i.test(e);
+  // powerEfficientEncoder is the standardised answer; the name regex is only
+  // a fallback for stacks that don't report it.
+  const hw = typeof powerEfficient === 'boolean'
+    ? powerEfficient
+    : /MediaFoundation|VideoToolbox|Vaapi|V4L2|NVENC|AMF|D3D11|External/i.test(e);
   const name =
     e.replace(/VideoEncodeAccelerator|EncodeAccelerator|VideoEncoder/g, '')
       .split('(')[0].trim() || e;

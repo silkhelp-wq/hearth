@@ -43,15 +43,19 @@ function readToken() {
 }
 
 /** Parse "v1.2.3" / "1.2.3" → [1,2,3]; returns null on garbage. */
+/** Parse "v1.2.3" / "1.2.3.4" → zero-padded [maj,min,pat,build]. */
 function parseVersion(v) {
-  const m = String(v).trim().replace(/^v/, '').match(/^(\d+)\.(\d+)\.(\d+)/);
-  return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+  const m = String(v).trim().replace(/^v/, '').match(/^(\d+(?:\.\d+){0,3})/);
+  if (!m) return null;
+  const parts = m[1].split('.').map(Number);
+  while (parts.length < 4) parts.push(0);
+  return parts;
 }
 
 function isNewer(remote, local) {
   const a = parseVersion(remote), b = parseVersion(local);
   if (!a || !b) return false;
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 4; i++) {
     if (a[i] > b[i]) return true;
     if (a[i] < b[i]) return false;
   }
@@ -97,7 +101,14 @@ function assetForPlatform(assets) {
     return match(/\.AppImage$/i) || match(/\.pacman$/i) || match(/\.deb$/i);
   }
   if (p === 'win32') return match(/\.exe$/i);
-  if (p === 'darwin') return match(/\.dmg$/i);
+  if (p === 'darwin') {
+    // Two dmgs ship per release (arm64 + x64) — grab the one for THIS chip,
+    // falling back to the other rather than nothing.
+    const dmgs = assets.filter((a) => /\.dmg$/i.test(a.name));
+    const arm = dmgs.find((a) => /arm64/i.test(a.name));
+    const x64 = dmgs.find((a) => !/arm64/i.test(a.name));
+    return process.arch === 'arm64' ? (arm || x64) : (x64 || arm);
+  }
   return null;
 }
 

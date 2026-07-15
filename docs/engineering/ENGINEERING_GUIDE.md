@@ -279,3 +279,22 @@ matching `vX.Y.Z`.
 - **Formal requirements:** [`../SRS.md`](../SRS.md)
 - **Full architecture narrative with per-version notes:**
   [`../ARCHITECTURE.md`](../ARCHITECTURE.md)
+
+
+## Versioning policy
+
+**Scheme: `0.MINOR.PATCH` — and 1.0.0 happens only when we declare bug-squash
+done.** Nothing in semver forces 1.0 after 0.9: components are unbounded
+integers, so `0.9.9 → 0.10.0 → 0.11.0 → … → 0.99.0 → 0.100.0` are all valid
+and correctly ordered (exactly how Python 3.10 followed 3.9).
+
+- **Fix / patch release** → bump PATCH: `0.9.4 → 0.9.5 → … → 0.9.999`. No limit.
+- **Feature release** → bump MINOR: `0.9.x → 0.10.0`. No limit.
+- **1.0.0** → a deliberate decision, never an overflow.
+
+**Why not `X.X.X.X`?** Tested, not assumed: electron-builder 26 hard-fails on
+a 4-part version (`Invalid version: "0.9.4.1"` from its normalizePackageData)
+before building anything, so 4-part versions cannot produce installers with
+this toolchain. npm merely tolerates it, which makes the failure a
+build-time surprise. Both updaters' version parsers nevertheless accept 1–4
+components (zero-padded comparison) as future-proofing.

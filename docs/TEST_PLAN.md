@@ -157,3 +157,9 @@ extract for any failure. File issues with TC ID in the title.
 | TC-79 | P1 | Both release workflows fire | Push a version tag | Actions shows BOTH "Release" and "Server Release" runs green; the public repo gets 4 installers + install-linux.sh + hearth-server-<ver>.tar.gz |
 | TC-80 | P1 | Shipped scripts are LF | Download install-linux.sh from a release; `file install-linux.sh` | Reports "ASCII text" WITHOUT "CRLF line terminators"; runs without "set: pipefail: invalid option name" |
 | TC-81 | P1 | Fresh-machine one-liner | On a clean Linux box: curl install-linux.sh from the latest release, run it with NO sed | Runs first try (LF), installs to ~/Applications/Hearth.AppImage, menu entry appears, app launches current |
+| TC-82 | P0 | Windows HW encode | Windows + NVIDIA (e.g. GTX 1080 Ti): share a screen, force **H.264**, 1080p60, stats on | Overlay reads `hw:` (MediaFoundation/NVENC). Auto/VP9/AV1 reading `sw:` on Pascal is EXPECTED — Pascal only encodes H.264 |
+| TC-83 | P0 | macOS HW encode | macOS: share a screen, force H.264, stats on | Overlay reads `hw:` (VideoToolbox) |
+| TC-84 | P0 | Intel Mac build exists | Check a release's assets | Both `Hearth-<ver>-arm64.dmg` AND `Hearth-<ver>.dmg` (x64) present; the x64 one launches on an Intel Mac |
+| TC-85 | P0 | macOS packaged launch (fuses) | Install the .dmg, right-click→Open | App launches and connects. If it dies instantly, suspect enableEmbeddedAsarIntegrityValidation — see notes |
+| TC-86 | P1 | Wayland capture still works | Linux/Wayland: share a screen after the enable-features fix | Portal opens once and capture works — proves WebRTCPipeWireCapturer survived (it was being wiped by the overwrite bug) |
+| TC-87 | P1 | Updater picks the right Mac arch | On an Apple Silicon Mac AND an Intel Mac, run an older build's update | Each downloads the dmg for its own chip (arm64 vs x64), never the other |

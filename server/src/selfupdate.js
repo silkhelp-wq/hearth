@@ -29,15 +29,19 @@ function token() {
   return null;
 }
 
+/** Parse "v1.2.3" / "1.2.3.4" → zero-padded [maj,min,pat,build]. */
 function parseVersion(v) {
-  const m = String(v).trim().replace(/^v/, '').match(/^(\d+)\.(\d+)\.(\d+)/);
-  return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+  const m = String(v).trim().replace(/^v/, '').match(/^(\d+(?:\.\d+){0,3})/);
+  if (!m) return null;
+  const parts = m[1].split('.').map(Number);
+  while (parts.length < 4) parts.push(0);
+  return parts;
 }
 
 function isNewer(remote, local) {
   const a = parseVersion(remote), b = parseVersion(local);
   if (!a || !b) return false;
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 4; i++) {
     if (a[i] > b[i]) return true;
     if (a[i] < b[i]) return false;
   }
