@@ -9,7 +9,17 @@ is private — but the apps are free for anyone to use.)
 
 ---
 
-## 📥 Download the app (everyone)
+## 1️⃣ Before you download — two things
+
+**One:** get the **server address** from whoever hosts your group's Hearth.
+
+**Two:** look at how it starts. If it starts with **`http://100.`** your group
+uses **Tailscale** (a free private network) and Hearth **cannot connect
+without it**: ask your host for the Tailscale invite, install it from
+[tailscale.com/download](https://tailscale.com/download), accept the invite,
+and check it shows **Connected**. (Address starts with `https://`? Skip this.)
+
+## 2️⃣ Download the app (everyone)
 
 Grab the latest from **[Releases](../../releases/latest)** and pick your system:
 
@@ -41,7 +51,7 @@ your host — the app and server need to speak the same language.
 
 ---
 
-## 🖥️ Host your own server (one person)
+## 3️⃣ Host your own server (one person)
 
 One person in the group runs the server on a computer that stays on. Download
 **`hearth-server-<version>.tar.gz`** from
@@ -60,7 +70,7 @@ Full step-by-step for a total beginner is included in the download.
 
 ---
 
-## ✨ What you get
+## ✨ What you get after installing
 
 🎤 Voice rooms · 📹 Camera · 🖥️ Screen share (up to 4K, pop-out or
 picture-in-picture) · 💬 Chat with reactions, emojis, GIFs, and video ·

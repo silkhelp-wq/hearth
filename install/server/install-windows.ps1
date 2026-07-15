@@ -4,6 +4,15 @@
 $ErrorActionPreference = "Stop"
 function Say($m) { Write-Host "==> $m" -ForegroundColor Green }
 
+Write-Host "Hearth — Windows server installer" -ForegroundColor Cyan
+Write-Host "This will:"
+Write-Host "  1. Install the server's dependencies"
+Write-Host "  2. Start the server IN THIS WINDOW (keep it open while friends are connected)"
+Write-Host "  3. Print your OWNER CLAIM CODE — paste it into the Hearth app (Settings -> Server)"
+Write-Host ""
+Write-Host "You need Node.js 22+ installed (https://nodejs.org)."
+$null = Read-Host "Press Enter to continue (Ctrl-C to cancel)"
+
 try { $null = node -v } catch { throw "Node.js is not installed. Get Node 22+ from https://nodejs.org then re-run." }
 $major = [int](node -p "process.versions.node.split('.')[0]")
 if ($major -lt 20) { throw "Node.js 20+ required (you have $(node -v))." }

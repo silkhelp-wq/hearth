@@ -59,10 +59,28 @@ jobs:
           repository: silkhelp-wq/hearth-releases
           token: ${{ secrets.HEARTH_PUBLIC_RELEASE_TOKEN }}
           tag_name: ${{ github.ref_name }}
-          body: >
-            Hearth ${{ github.ref_name }} — installers for Windows (.exe),
-            macOS (.dmg), and Linux (.AppImage / .deb). Pick the file for
-            your system; install help lives in this repo's README.
+          body: |
+            ## 1️⃣ Before you download
+            - Get the **server address** from your host.
+            - Address starts with `http://100.`? Install **[Tailscale](https://tailscale.com/download)**, accept your host's invite, and make sure it shows **Connected** — Hearth can't reach the server without it.
+
+            ## 2️⃣ Pick your file
+            | Your computer | Download |
+            |---|---|
+            | 🪟 Windows 10/11 | `Hearth.Setup.<version>.exe` |
+            | 🍎 Mac — Apple Silicon | `Hearth-<version>-arm64.dmg` |
+            | 🍎 Mac — Intel | `Hearth-<version>.dmg` |
+            | 🐧 Linux (any distro) | `Hearth-<version>.AppImage` — or run `install-linux.sh` for a menu entry + cleanup |
+            | 🐧 Ubuntu / Debian | `hearth_<version>_amd64.deb` |
+            | 🖥️ **Hosting the server?** | `hearth-server-<version>.tar.gz` — beginner guide inside |
+
+            ## 3️⃣ Before you install
+            The builds are unsigned (a private hobby app), so your OS warns once:
+            - **Windows:** SmartScreen → **More info → Run anyway**. The installer then shows setup notes.
+            - **Mac:** first open is **right-click the app → Open → Open**. A READ ME FIRST inside the dmg walks you through it.
+            - **Linux:** make the AppImage executable (right-click → Properties → allow executing), or just use `install-linux.sh`.
+
+            Full beginner guide: this repo's README.
           files: |
             client/release/*.AppImage
             client/release/*.deb

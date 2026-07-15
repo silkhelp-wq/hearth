@@ -10,6 +10,18 @@ set -euo pipefail
 say() { printf '\n\033[1;32m==>\033[0m %s\n' "$1"; }
 die() { printf '\n\033[1;31mError:\033[0m %s\n' "$1" >&2; exit 1; }
 
+printf '\033[1mHearth — server installer\033[0m\n'
+echo "This will:"
+echo "  1. Install the server's dependencies (compiles a few native pieces)"
+echo "  2. Set up a background service so it runs on its own (where systemd exists)"
+echo "  3. Print your OWNER CLAIM CODE — you'll paste it into the Hearth app"
+echo ""
+echo "Before continuing you need: Node.js 22+ installed."
+echo "Home hosting? Also have Tailscale installed and connected."
+echo "Cloud/VPS?   Set your public IP first, e.g.:"
+echo "  echo \"HEARTH_ANNOUNCED_IP=YOUR.PUBLIC.IP\" >> ~/.config/hearth/hearth.env"
+if [ -t 0 ]; then read -r -p "Press Enter to continue (Ctrl-C to cancel)… " _; fi
+
 command -v node >/dev/null || die "Node.js is not installed. Install Node 22+ first: https://nodejs.org"
 NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
 [ "$NODE_MAJOR" -ge 20 ] || die "Node.js 20+ required (you have $(node -v))."

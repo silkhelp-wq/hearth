@@ -1,0 +1,26 @@
+HEARTH SETUP NOTES  (shown here before installing - not a license)
+
+WHAT HAPPENS NEXT
+  1. Pick an install folder (the suggested one is fine).
+  2. Hearth installs and can start right away.
+
+BEFORE YOU CONTINUE, HAVE THESE READY
+  * The SERVER ADDRESS from your host (looks like http://100.x.x.x:4443
+    or https://something).
+  * If the address starts with http://100. you must have Tailscale
+    installed, signed in, and showing "Connected" BEFORE Hearth can
+    connect. Ask your host for the Tailscale invite if you don't have it.
+    Download: https://tailscale.com/download
+
+AFTER INSTALLING - FIRST RUN
+  * Windows Firewall may ask to allow Hearth on your network: click Allow.
+  * Paste the server address, pick a display name, connect.
+  * First time you use the mic / camera / screen share, Windows asks
+    permission - say yes.
+
+STAYING UP TO DATE
+  Hearth checks for updates when it starts and can install them itself.
+  If you skip updates for a long time you might not be able to join your
+  host - the app and server need to speak the same language.
+
+Questions? The download page README has the full beginner guide.

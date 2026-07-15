@@ -25,6 +25,14 @@ say()  { printf '\n\033[1;32m==>\033[0m %s\n' "$1"; }
 warn() { printf '\033[1;33m  ! \033[0m%s\n' "$1"; }
 die()  { printf '\n\033[1;31mError:\033[0m %s\n' "$1" >&2; exit 1; }
 
+printf '\033[1mHearth — Linux client installer\033[0m\n'
+echo "This will:"
+echo "  1. Download the latest Hearth (or use a file you pass in)"
+echo "  2. Install it to $TARGET (one stable path — updates land here)"
+echo "  3. Add/repair the app-menu entry"
+echo "  4. Remove old Hearth copies (your settings are kept)"
+if [ -t 0 ]; then read -r -p "Press Enter to continue (Ctrl-C to cancel)… " _; fi
+
 mkdir -p "$TARGET_DIR" "$(dirname "$DESKTOP")"
 
 # ── 1. Get the AppImage ───────────────────────────────────────────────────

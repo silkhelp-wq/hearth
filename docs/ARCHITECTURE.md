@@ -578,3 +578,19 @@ introduced and settled the versioning question with evidence:
 3. Everything else checked clean: uiohook-napi ships darwin-x64 prebuilds (the
    Intel dmg gets working PTT), one `enable-features` call remains, single
    shortEncoder call site updated, doc tables intact.
+
+### Staged install instructions at every surface (v0.9.5)
+
+Instructions now appear at each stage of the journey, not just in docs:
+**before download** — the public repo README leads with the two
+prerequisites (server address, Tailscale-if-`http://100.`), and every public
+release's body is a staged guide (before-download → pick-your-file table →
+before-install warnings) rendered directly above the assets. **Before
+install** — Windows: the NSIS assisted installer shows `installer-notes.txt`
+as a page before proceeding (prereqs, firewall prompt, first-run steps);
+macOS: the dmg window contains `READ ME FIRST.txt` beside the app
+(drag-to-install, the right-click→Open ritual, permission walk-through);
+Linux/server: all three script installers open with a pre-flight intro
+stating exactly what will happen and pause for Enter on a tty. **During
+install** — the NSIS page, the dmg layout, and the scripts' step-by-step
+output carry the remaining guidance.

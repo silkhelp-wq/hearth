@@ -163,3 +163,6 @@ extract for any failure. File issues with TC ID in the title.
 | TC-85 | P0 | macOS packaged launch (fuses) | Install the .dmg, right-click→Open | App launches and connects. If it dies instantly, suspect enableEmbeddedAsarIntegrityValidation — see notes |
 | TC-86 | P1 | Wayland capture still works | Linux/Wayland: share a screen after the enable-features fix | Portal opens once and capture works — proves WebRTCPipeWireCapturer survived (it was being wiped by the overwrite bug) |
 | TC-87 | P1 | Updater picks the right Mac arch | On an Apple Silicon Mac AND an Intel Mac, run an older build's update | Each downloads the dmg for its own chip (arm64 vs x64), never the other |
+| TC-88 | P1 | Windows pre-install notes | Run the .exe installer | A setup-notes page (prereqs, Tailscale, firewall heads-up) appears before install proceeds |
+| TC-89 | P1 | dmg read-me | Open the .dmg | Window shows app + Applications link + READ ME FIRST.txt; the file opens and covers right-click→Open and permissions |
+| TC-90 | P1 | Release page teaches | Open the latest public release | Staged guide (before download / pick file / before install) renders above the assets |
