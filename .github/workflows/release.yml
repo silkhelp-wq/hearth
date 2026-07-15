@@ -10,6 +10,9 @@ on:
 permissions:
   contents: write
 
+env:
+  PUBLIC_RELEASE_TOKEN: ${{ secrets.HEARTH_PUBLIC_RELEASE_TOKEN }}
+
 jobs:
   build:
     name: installers (${{ matrix.os }})
@@ -43,6 +46,22 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          files: |
+            client/release/*.AppImage
+            client/release/*.deb
+            client/release/*.exe
+            client/release/*.dmg
+      - name: Mirror installers to the public downloads repo
+        if: env.PUBLIC_RELEASE_TOKEN != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          repository: silkhelp-wq/hearth-releases
+          token: ${{ secrets.HEARTH_PUBLIC_RELEASE_TOKEN }}
+          tag_name: ${{ github.ref_name }}
+          body: >
+            Hearth ${{ github.ref_name }} — installers for Windows (.exe),
+            macOS (.dmg), and Linux (.AppImage / .deb). Pick the file for
+            your system; install help lives in this repo's README.
           files: |
             client/release/*.AppImage
             client/release/*.deb

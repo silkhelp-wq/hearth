@@ -11,6 +11,7 @@ const path = require('path');
 const https = require('https');
 
 const REPO = 'silkhelp-wq/hearth';
+const PUBLIC_REPO = 'silkhelp-wq/hearth-releases';
 const VERSION = require('../package.json').version;
 
 function token() {
@@ -67,19 +68,27 @@ function apiGet(urlPath, tok) {
   });
 }
 
+function shape(rel, feed) {
+  const latest = rel.tag_name;
+  return {
+    available: isNewer(latest, VERSION),
+    current: VERSION,
+    latest,
+    feed,
+    notes: (rel.body || '').slice(0, 2000),
+    htmlUrl: rel.html_url
+  };
+}
+
 async function checkForUpdate() {
+  // Public downloads repo first — token-free.
+  try {
+    return shape(await apiGet(`/repos/${PUBLIC_REPO}/releases/latest`, null), 'public');
+  } catch { /* fall back to the private repo + token */ }
   const tok = token();
   if (!tok) return { available: false, current: VERSION, reason: 'not configured' };
   try {
-    const rel = await apiGet(`/repos/${REPO}/releases/latest`, tok);
-    const latest = rel.tag_name;
-    return {
-      available: isNewer(latest, VERSION),
-      current: VERSION,
-      latest,
-      notes: (rel.body || '').slice(0, 2000),
-      htmlUrl: rel.html_url
-    };
+    return shape(await apiGet(`/repos/${REPO}/releases/latest`, tok), 'private');
   } catch (err) {
     return { available: false, current: VERSION, error: err.message };
   }

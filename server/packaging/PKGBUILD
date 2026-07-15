@@ -14,7 +14,7 @@
 # package upgrades or removal.
 
 pkgname=hearth-server
-pkgver=0.8.0
+pkgver=0.8.2
 pkgrel=1
 pkgdesc="Self-hosted voice/video/chat server (Hearth)"
 arch=('x86_64')

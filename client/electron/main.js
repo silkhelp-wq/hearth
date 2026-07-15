@@ -115,9 +115,16 @@ function finishCapture(binding) {
 // ------------------------------------------------------------------ window
 
 function createWindow() {
+  const stateFile = path.join(app.getPath('userData'), 'window-state.json');
+  let winState = {};
+  try { winState = JSON.parse(require('fs').readFileSync(stateFile, 'utf8')); }
+  catch { /* first run */ }
+
   win = new BrowserWindow({
-    width: 1360,
-    height: 860,
+    width: winState.width || 1360,
+    height: winState.height || 860,
+    x: winState.x,
+    y: winState.y,
     minWidth: 960,
     minHeight: 620,
     backgroundColor: '#0d1210',
@@ -128,6 +135,17 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: false
     }
+  });
+
+  if (winState.maximized) win.maximize();
+  win.on('close', () => {
+    try {
+      const b = win.getNormalBounds();
+      require('fs').writeFileSync(stateFile, JSON.stringify({
+        width: b.width, height: b.height, x: b.x, y: b.y,
+        maximized: win.isMaximized()
+      }));
+    } catch { /* non-fatal */ }
   });
 
   win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));

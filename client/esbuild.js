@@ -18,7 +18,11 @@ esbuild.buildSync({
   platform: 'browser',
   target: ['chrome130'],
   outfile: dist('renderer.js'),
-  sourcemap: 'inline',
+  // Hardening: NO sourcemap (an inline map ships the entire original source
+  // inside the bundle), minified identifiers/whitespace, no license banners.
+  sourcemap: false,
+  minify: true,
+  legalComments: 'none',
   logLevel: 'info'
 });
 

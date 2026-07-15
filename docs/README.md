@@ -55,6 +55,7 @@ friends — one person hosts the server, everyone else runs the desktop app.
 | Document | What it covers |
 |----------|----------------|
 | [Deployment Guide](deployment/DEPLOYMENT_GUIDE.md) | On-prem and any-cloud deployment: networking, TLS, containers, cloud-specific notes, monitoring, backups, scaling, security |
+| [Distribution & Code Protection](deployment/DISTRIBUTION.md) | Public downloads for non-collaborators, shipped-code hardening (honest limits), and the mobile roadmap |
 | [Public Deploy](DEPLOY_PUBLIC.md) | Public VPS hosting with TLS |
 
 ### 📊 Diagrams

@@ -21,7 +21,11 @@ const path = require('path');
 const os = require('os');
 const { spawn } = require('child_process');
 
-const REPO = 'silkhelp-wq/hearth';
+const REPO = 'silkhelp-wq/hearth';               // private source repo
+const PUBLIC_REPO = 'silkhelp-wq/hearth-releases'; // public installers-only repo
+
+// Which feed served the last successful check — download uses the same one.
+let feed = null;
 
 function readToken() {
   // Packaged: resources/update-token.txt (extraResources). Dev: build/.
@@ -98,11 +102,21 @@ function assetForPlatform(assets) {
 }
 
 async function checkForUpdate() {
-  const token = readToken();
-  if (!token) return { available: false, reason: 'updates not configured' };
+  // Public downloads repo first — no token needed, works for anyone.
+  let release = null;
+  try {
+    const { body } = await ghRequest(`/repos/${PUBLIC_REPO}/releases/latest`, null);
+    release = JSON.parse(body.toString());
+    feed = { repo: PUBLIC_REPO, token: null };
+  } catch { /* public repo absent or unreachable — fall back */ }
 
-  const { body } = await ghRequest(`/repos/${REPO}/releases/latest`, token);
-  const release = JSON.parse(body.toString());
+  if (!release) {
+    const token = readToken();
+    if (!token) return { available: false, reason: 'updates not configured' };
+    const { body } = await ghRequest(`/repos/${REPO}/releases/latest`, token);
+    release = JSON.parse(body.toString());
+    feed = { repo: REPO, token };
+  }
   const latest = release.tag_name;
   if (!isNewer(latest, app.getVersion())) {
     return { available: false, current: app.getVersion(), latest };
@@ -121,9 +135,9 @@ async function checkForUpdate() {
 
 /** Download the asset via the API (auth-preserving) to a temp file. */
 async function downloadAsset(assetId, assetName, onProgress) {
-  const token = readToken();
+  const f = feed || { repo: REPO, token: readToken() };
   const first = await ghRequest(
-    `/repos/${REPO}/releases/assets/${assetId}`, token, { raw: true });
+    `/repos/${f.repo}/releases/assets/${assetId}`, f.token, { raw: true });
 
   let buf;
   if (first.redirect) {

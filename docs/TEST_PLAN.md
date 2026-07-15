@@ -145,3 +145,6 @@ extract for any failure. File issues with TC ID in the title.
 | TC-67 | P1 | Video embeds | Paste a bare .mp4/.webm URL | Inline video player with controls; only metadata preloads until you press play; dead link degrades to a plain link |
 | TC-68 | P1 | YouTube lite embed | Paste a youtube.com/watch and a youtu.be link | Thumbnail + ▶ renders (one jpg fetched); click swaps in the nocookie player and plays; nothing else loads before the click |
 | TC-69 | P1 | 5 GB chat cap | Fresh install; check Settings → Server storage caps | Chat history default reads 5120 MB; prune-oldest still enforces the cap |
+| TC-70 | P1 | Window fills + remembers | Resize/maximize the window; quit; relaunch | Layout fills the window at every size with no dead zone below the composer; app reopens at the size/position/maximized state you left it |
+| TC-71 | P1 | Public download + update feed | With hearth-releases populated: download an installer logged OUT of GitHub; run an older build's update check | Assets download with no auth; updater reports the newer version from the public feed and installs it; server monitor shows feed: public |
+| TC-72 | P1 | No source in shipped bundle | Unpack a fresh installer's asar; inspect dist/renderer.js | Bundle is minified, contains no sourceMappingURL and no original src/ files; ~sub-500 KB (was 2.3 MB with the embedded sourcemap) |

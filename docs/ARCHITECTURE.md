@@ -423,3 +423,30 @@ Chromium's transient decode buffers remain Chromium's own.
 The chat storage default rose 1 GB → **5 GB** (`HEARTH_CHAT_CAP_MB=5120`),
 still rolling-prune-oldest at the cap. Existing servers keep their stored
 setting — raise it in Settings → Server → storage caps.
+
+### Full-window layout + UI tightening (v0.8.1)
+
+The root layout used `height: 100vh`, and Chromium's vh units can go stale
+after resizes under Wayland fractional scaling — leaving a dead zone below
+the composer that grew as the window did. The chain is now `height: 100%`
+end-to-end (html → body → .screen), which tracks reflow reliably, with
+`overflow: hidden` on body so nothing scrolls the shell itself. The window
+also persists its size/position/maximized state (`window-state.json` in
+userData) and reopens exactly as left. Spacing pass: slimmer bottom control
+bar, 232px rail, tighter message rhythm and composer padding — less chrome,
+same theme.
+
+### Public distribution + shipped-code hardening (v0.8.2)
+
+Installers now mirror to a PUBLIC installers-only repo
+(`hearth-releases`) on every tagged release (CI step, gated on the
+`HEARTH_PUBLIC_RELEASE_TOKEN` secret) — anyone can download without repo
+access, and both updaters check that public feed FIRST with no token,
+falling back to private+token only if it's absent. Once the public repo has
+a release, installers ship zero credentials. Hardening: the renderer bundle
+previously embedded an inline sourcemap — the complete original source, 84%
+of the bundle — now stripped; output is minified (2.3 MB → ~369 KB) with
+asar pinned explicitly. DIAGRAMS.md fix: mermaid dotted-edge labels
+containing dots (`-.Socket.IO signaling.->`) collide with the `-. .->` 
+delimiters; converted to pipe-label form and all 10 diagrams validated
+against mermaid 11.16.0.

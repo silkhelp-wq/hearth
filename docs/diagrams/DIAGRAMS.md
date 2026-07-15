@@ -30,10 +30,10 @@ graph TB
         end
     end
 
-    CA -.Socket.IO signaling.-> SIO
-    CB -.Socket.IO signaling.-> SIO
-    CC -.Socket.IO signaling.-> SIO
-    CD -.Socket.IO signaling.-> SIO
+    CA -.->|Socket.IO signaling| SIO
+    CB -.->|Socket.IO signaling| SIO
+    CC -.->|Socket.IO signaling| SIO
+    CD -.->|Socket.IO signaling| SIO
 
     CA ==SRTP media==> SFU
     CB ==SRTP media==> SFU
