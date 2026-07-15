@@ -166,3 +166,5 @@ extract for any failure. File issues with TC ID in the title.
 | TC-88 | P1 | Windows pre-install notes | Run the .exe installer | A setup-notes page (prereqs, Tailscale, firewall heads-up) appears before install proceeds |
 | TC-89 | P1 | dmg read-me | Open the .dmg | Window shows app + Applications link + READ ME FIRST.txt; the file opens and covers right-click→Open and permissions |
 | TC-90 | P1 | Release page teaches | Open the latest public release | Staged guide (before download / pick file / before install) renders above the assets |
+| TC-91 | P1 | No asset race on release | Push a version tag; watch all 3 matrix jobs | All three go green; install-linux.sh uploads exactly once (from ubuntu); no "Not Found - update-a-release-asset" |
+| TC-92 | P1 | dmg window fits its contents | Open the .dmg on macOS | App, Applications link and READ ME FIRST.txt all fully visible, nothing clipped at the bottom edge |

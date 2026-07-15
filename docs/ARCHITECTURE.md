@@ -594,3 +594,30 @@ Linux/server: all three script installers open with a pre-flight intro
 stating exactly what will happen and pause for Enter on a tty. **During
 install** — the NSIS page, the dmg layout, and the scripts' step-by-step
 output carry the remaining guidance.
+
+### Release-asset race + install-surface config fixes (v0.9.6)
+
+**The v0.9.5 macOS job failed on a 3-way asset race.** All three matrix
+runners uploaded `install/client/install-linux.sh` to the same release:
+ubuntu created the asset, windows replaced it (delete + re-upload), and macOS
+tried to replace it mid-flight → `Error: Not Found -
+update-a-release-asset`. (The release itself still completed — the dmgs
+uploaded on the lines after the error.) Fixed by uploading the script from the
+ubuntu runner only, as separate `if: matrix.os == 'ubuntu-latest'` steps for
+both the private and mirror uploads. Note a conditional *inside* `files:` is
+NOT a valid alternative: it yields an empty pattern on the other runners and
+`glob.sync('')` throws `must provide pattern` — the v0.9.3 revert of that
+conditional was right for the wrong reason.
+
+**Three latent v0.9.5 config bugs, caught by build-testing:**
+- dmg `path` contained spaces (`build/READ ME FIRST.txt`) — now a space-free
+  path with `name: "READ ME FIRST.txt"` for display (DmgContent supports it).
+- dmg had no explicit `window`; the default 540x380 clips a third icon
+  centred at y=330 — now 560x450.
+- `desktopName` is **not** a valid `build.linux` key (schema rejects it; the
+  build died with "Invalid configuration object"). It belongs at the
+  package.json root, and we deliberately leave it unset: electron-builder then
+  computes `wmClass = appInfo.productName` = "Hearth", which is exactly what
+  install-linux.sh already writes as `StartupWMClass`. Setting it would
+  lowercase the app_id and break window association for every existing
+  install. The build's desktopName warning is a false positive here.

@@ -51,7 +51,13 @@ jobs:
             client/release/*.deb
             client/release/*.exe
             client/release/*.dmg
-            install/client/install-linux.sh
+      - name: Attach the Linux installer script (ubuntu only)
+        # One runner only: all three uploading the same asset name races —
+        # one deletes the asset another is mid-replace on → 404 Not Found.
+        if: matrix.os == 'ubuntu-latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: install/client/install-linux.sh
       - name: Mirror installers to the public downloads repo
         if: env.PUBLIC_RELEASE_TOKEN != ''
         uses: softprops/action-gh-release@v2
@@ -86,4 +92,11 @@ jobs:
             client/release/*.deb
             client/release/*.exe
             client/release/*.dmg
-            install/client/install-linux.sh
+      - name: Mirror the Linux installer script (ubuntu only)
+        if: matrix.os == 'ubuntu-latest' && env.PUBLIC_RELEASE_TOKEN != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          repository: silkhelp-wq/hearth-releases
+          token: ${{ secrets.HEARTH_PUBLIC_RELEASE_TOKEN }}
+          tag_name: ${{ github.ref_name }}
+          files: install/client/install-linux.sh

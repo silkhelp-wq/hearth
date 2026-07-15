@@ -1,0 +1,28 @@
+HEARTH — READ ME FIRST (macOS)
+
+INSTALL (you are one drag away)
+  1. Drag the Hearth app onto the Applications folder icon in this window.
+  2. Eject this disk image.
+
+FIRST OPEN — IMPORTANT
+  macOS will block a normal double-click the first time because Hearth
+  is from a small developer. Do this instead, ONCE:
+    * Open your Applications folder.
+    * RIGHT-CLICK (or Control-click) Hearth  ->  Open  ->  Open.
+  After that, it opens normally forever.
+
+BEFORE CONNECTING
+  * Get the SERVER ADDRESS from your host.
+  * If it starts with http://100.  you need Tailscale installed and
+    signed in first (ask your host for the invite):
+    https://tailscale.com/download
+
+PERMISSIONS MACOS WILL ASK FOR
+  * Microphone / Camera — allow when prompted.
+  * Screen sharing: System Settings -> Privacy & Security ->
+    Screen Recording -> enable Hearth, then reopen the app.
+  * Push-to-talk while gaming: also grant Accessibility and
+    Input Monitoring when asked.
+
+Hearth keeps itself up to date. If you skip updates for a long time you
+might not be able to join your host.

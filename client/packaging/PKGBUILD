@@ -15,7 +15,7 @@
 # It picks up the AppImage from ../release/ automatically.
 
 pkgname=hearth
-pkgver=0.9.5
+pkgver=0.9.6
 pkgrel=1
 pkgdesc="Self-hosted voice/video/screen-share/chat client (Hearth)"
 arch=('x86_64')

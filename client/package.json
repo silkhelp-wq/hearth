@@ -1,7 +1,7 @@
 {
   "name": "hearth",
   "productName": "Hearth",
-  "version": "0.9.5",
+  "version": "0.9.6",
   "description": "Self-hosted voice, camera, screen-share, and chat hangout for your crew",
   "homepage": "https://github.com/silkhelp-wq/hearth",
   "license": "MIT",
@@ -112,22 +112,27 @@
       "onlyLoadAppFromAsar": true
     },
     "dmg": {
+      "window": {
+        "width": 560,
+        "height": 450
+      },
       "contents": [
         {
-          "x": 140,
-          "y": 160
+          "x": 150,
+          "y": 180
         },
         {
-          "x": 400,
-          "y": 160,
+          "x": 410,
+          "y": 180,
           "type": "link",
           "path": "/Applications"
         },
         {
-          "x": 270,
-          "y": 300,
+          "x": 280,
+          "y": 330,
           "type": "file",
-          "path": "build/READ ME FIRST.txt"
+          "path": "build/read-me-first.txt",
+          "name": "READ ME FIRST.txt"
         }
       ]
     }
