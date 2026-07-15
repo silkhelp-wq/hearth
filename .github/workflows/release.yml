@@ -51,6 +51,7 @@ jobs:
             client/release/*.deb
             client/release/*.exe
             client/release/*.dmg
+            install/client/install-linux.sh
       - name: Mirror installers to the public downloads repo
         if: env.PUBLIC_RELEASE_TOKEN != ''
         uses: softprops/action-gh-release@v2
@@ -67,3 +68,4 @@ jobs:
             client/release/*.deb
             client/release/*.exe
             client/release/*.dmg
+            install/client/install-linux.sh

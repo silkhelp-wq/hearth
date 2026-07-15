@@ -27,6 +27,14 @@ normal for a small private app:
 
 Then paste in the server address your host gave you, pick a name, and you're in.
 
+**🐧 Linux shortcut:** download `install-linux.sh` from the same release and run
+`bash install-linux.sh` — it grabs the latest Hearth, adds it to your app menu,
+and removes any old copies. Hearth then keeps itself up to date in place.
+
+**Staying current matters:** Hearth checks for updates when it starts and offers
+to install them. If you skip updates for a long time you may not be able to join
+your host — the app and server need to speak the same language.
+
 > If your host's address starts with `http://100.`, first install the free
 > **[Tailscale](https://tailscale.com/download)** app and accept your host's
 > invite — that's the private tunnel the group uses.

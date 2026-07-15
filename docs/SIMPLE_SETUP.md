@@ -53,6 +53,14 @@ big company. Here's how to say "yes, I'm sure":
 - **Linux:** right-click the file → **Properties** → tick **"Allow executing
   file as program"** → then double-click it.
 
+> **Linux tip — want Hearth in your app menu, always up to date?** Download
+> `install-linux.sh` from the downloads page and run:
+> ```
+> bash install-linux.sh
+> ```
+> It fetches the latest Hearth, puts it in your menu, and cleans up any old
+> copies. Run it again any time to repair things.
+
 ### Step 4 — Get in!
 
 1. Hearth opens and asks for the **server address**. Paste the one your host

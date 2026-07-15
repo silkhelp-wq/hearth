@@ -9,7 +9,7 @@
  *   - global push-to-talk (uiohook-napi, works while the window is unfocused)
  */
 
-const { app, BrowserWindow, ipcMain, session, desktopCapturer } = require('electron');
+const { app, BrowserWindow, ipcMain, session, desktopCapturer, dialog } = require('electron');
 const path = require('path');
 const updater = require('./updater');
 
@@ -152,6 +152,48 @@ function createWindow() {
   win.on('closed', () => { win = null; });
 }
 
+/**
+ * Launch-time version check. Runs a few seconds after the window opens (so it
+ * never delays startup) and only nags when there is genuinely something newer.
+ * Offers to update immediately, or lets the user carry on and update later
+ * from Settings. Silent on any failure — offline must never block the app.
+ */
+async function checkVersionOnLaunch() {
+  try {
+    const info = await updater.checkForUpdate();
+    if (!info?.available) return;
+
+    const { response } = await dialog.showMessageBox(win, {
+      type: 'info',
+      buttons: ['Update now', 'Not now'],
+      defaultId: 0,
+      cancelId: 1,
+      title: 'Hearth update available',
+      message: `Hearth ${info.latest} is out — you have ${info.current}.`,
+      detail:
+        'Updating takes about a minute and Hearth restarts itself when it\'s done.\n\n' +
+        'You can keep using this version for now and update later from ' +
+        'Settings → Audio → Check for updates.\n\n' +
+        'Heads up: if you stay on an old version you might not be able to join ' +
+        'your host. The server and app have to speak the same language, so an ' +
+        'out-of-date app can fail to connect or lose features after the host ' +
+        'upgrades.',
+      noLink: true
+    });
+    if (response !== 0) return;
+
+    if (!info.assetId) {                       // no installer for this platform
+      require('electron').shell.openExternal(info.htmlUrl);
+      return;
+    }
+    const file = await updater.downloadAsset(info.assetId, info.assetName,
+      (pct) => win?.webContents.send('update:progress', pct));
+    await updater.installUpdate(file);         // installs and relaunches
+  } catch (err) {
+    console.warn('[update] launch check skipped:', err.message);
+  }
+}
+
 app.whenReady().then(() => {
   // Screen-share: resolve getDisplayMedia() with whatever the renderer's
   // picker chose. With the PipeWire flag above, getSources() on Wayland
@@ -276,6 +318,8 @@ app.whenReady().then(() => {
 
   loadUiohook();
   createWindow();
+  // Nag about a stale version a few seconds in — never blocks startup.
+  setTimeout(checkVersionOnLaunch, 4000);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

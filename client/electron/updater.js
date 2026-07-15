@@ -176,17 +176,34 @@ async function installUpdate(filePath) {
   const p = process.platform;
   if (p === 'linux' && /\.AppImage$/i.test(filePath)) {
     fs.chmodSync(filePath, 0o755);
-    // Replace the running AppImage if we can locate it, else just launch.
     const running = process.env.APPIMAGE;
     if (running) {
+      // You CANNOT copy over a running executable on Linux — the kernel
+      // returns ETXTBSY ("text file busy"). The old code did exactly that,
+      // silently swallowed the error, and launched the /tmp copy instead:
+      // the app on disk never changed, so every launch from the menu ran the
+      // old version and offered the same update again, forever.
+      //
+      // rename() replaces the directory entry atomically and works fine while
+      // the old inode is executing (the running process keeps it until exit).
+      // It must be on the SAME filesystem as the target, so stage it beside.
+      const dir = path.dirname(running);
+      const staged = path.join(dir, `.hearth-update-${process.pid}.AppImage`);
       try {
-        fs.copyFileSync(filePath, running);
-        fs.chmodSync(running, 0o755);
+        fs.copyFileSync(filePath, staged);
+        fs.chmodSync(staged, 0o755);
+        const size = fs.statSync(staged).size;
+        if (size < 10 * 1024 * 1024) throw new Error(`staged file too small (${size} bytes)`);
+        fs.renameSync(staged, running);          // atomic in-place swap
         spawn(running, [], { detached: true, stdio: 'ignore' }).unref();
         setTimeout(() => app.quit(), 400);
         return;
-      } catch { /* fall through to plain launch */ }
+      } catch (err) {
+        console.error('[update] in-place replace failed:', err.message);
+        try { fs.unlinkSync(staged); } catch { /* nothing staged */ }
+      }
     }
+    // No $APPIMAGE (unpacked run) or the swap failed — launch what we fetched.
     spawn(filePath, [], { detached: true, stdio: 'ignore' }).unref();
     setTimeout(() => app.quit(), 400);
     return;

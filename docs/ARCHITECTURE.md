@@ -476,3 +476,30 @@ integrity-locked dense machine code) are in place.
 install for the app and all three server hosting styles, written for a total
 beginner; surfaced at the top of the docs index and shipped inside the server
 tarball as its README.
+
+### AppImage update loop fix + launch version check (v0.9.1)
+
+**The update loop, root-caused:** `installUpdate` replaced the running AppImage
+with `copyFileSync`, but Linux refuses to write a file that is currently
+executing (**ETXTBSY**, "text file busy"). The error was swallowed by a bare
+`catch`, so it fell through to launching the freshly-downloaded /tmp copy —
+the user saw the new version *that session*, while the file on disk stayed
+old. Every menu launch then ran the stale build and offered the same update
+again, forever. Fix: stage the new AppImage beside the target (same
+filesystem), sanity-check its size, then `renameSync` over the target —
+rename swaps the directory entry atomically and is legal while the old inode
+executes.
+
+**Compounding cause:** the menu entry pointed at a *versioned* filename
+(`Hearth-0.6.5.AppImage`), so even a working update elsewhere could never be
+picked up. `install/client/install-linux.sh` now installs to one stable path
+(`~/Applications/Hearth.AppImage`), points the `.desktop` there, purges stale
+AppImages and menu entries, and leaves `~/.config/Hearth` (identity/settings)
+alone. It ships as a release asset in both repos.
+
+**Launch version check:** ~4s after the window opens (never blocking startup),
+the app checks the public feed and, if something newer exists, shows a native
+dialog — *Update now* (downloads, installs, relaunches) or *Not now* (carry on;
+update later from Settings). The dialog warns that staying on an old version
+might prevent joining the host, since app and server must speak the same
+protocol. Silent on any failure — offline must never block the app.
