@@ -11,9 +11,15 @@ on:
 permissions:
   contents: write
 
+# The `secrets` context is unavailable in a job-level `if` (GitHub only allows
+# github/needs/vars/inputs there) — using it is a parse error that kills the
+# whole workflow. Map it to env at workflow level and gate the publish STEP,
+# where the env context IS available.
+env:
+  PUBLIC_RELEASE_TOKEN: ${{ secrets.HEARTH_PUBLIC_RELEASE_TOKEN }}
+
 jobs:
   package-server:
-    if: ${{ secrets.HEARTH_PUBLIC_RELEASE_TOKEN != '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,6 +40,7 @@ jobs:
           tar -czf "hearth-server-${VER}.tar.gz" "$STAGE"
           echo "Built hearth-server-${VER}.tar.gz"
       - name: Publish server tarball to the public downloads repo
+        if: env.PUBLIC_RELEASE_TOKEN != ''
         uses: softprops/action-gh-release@v2
         with:
           repository: silkhelp-wq/hearth-releases

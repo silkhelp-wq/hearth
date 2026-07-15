@@ -503,3 +503,15 @@ dialog — *Update now* (downloads, installs, relaunches) or *Not now* (carry on
 update later from Settings). The dialog warns that staying on an old version
 might prevent joining the host, since app and server must speak the same
 protocol. Silent on any failure — offline must never block the app.
+
+### Server-release workflow gate fix (v0.9.2)
+
+The Server Release workflow gated its job with
+`if: ${{ secrets.HEARTH_PUBLIC_RELEASE_TOKEN != '' }}`. The `secrets` context
+is **not available in a job-level `if`** (GitHub allows only github/needs/vars/
+inputs there), so the expression is a parse error and the workflow never ran —
+no server tarball was ever published. Fixed by mapping the secret to a
+workflow-level `env` and gating the publish STEP instead (`if:
+env.PUBLIC_RELEASE_TOKEN != ''`), the same pattern release.yml already proves.
+Note `env` is likewise unavailable in job-level `if` — step-level gating is the
+only correct place.
