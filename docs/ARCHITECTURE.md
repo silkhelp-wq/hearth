@@ -515,3 +515,19 @@ workflow-level `env` and gating the publish STEP instead (`if:
 env.PUBLIC_RELEASE_TOKEN != ''`), the same pattern release.yml already proves.
 Note `env` is likewise unavailable in job-level `if` — step-level gating is the
 only correct place.
+
+### CRLF corruption of shipped shell scripts (v0.9.2)
+
+`install-linux.sh` shipped with CRLF endings and died on first run with
+`set: pipefail: invalid option name`. Cause: the release workflow is a matrix
+(ubuntu/windows/macos) and every runner executed the upload step — GitHub's
+**Windows runner checks out with `autocrlf=true`**, rewriting the LF script to
+CRLF, and its upload overwrote the Linux one (95 lines → 95 extra bytes, an
+exact tell). Two fixes: a `.gitattributes` pinning `*.sh` (plus Dockerfile/yml)
+to `eol=lf` and `*.ps1` to `eol=crlf` so no checkout can rewrite them, and the
+release workflow now uploads the shell script from the ubuntu runner only.
+
+Note (v0.9.3): the CRLF fix is `.gitattributes` alone — pinning `*.sh` to
+`eol=lf` makes EVERY checkout (including GitHub's Windows runner, which
+defaults to autocrlf=true) produce LF, so the matrix upload is harmless and
+release.yml needs no conditional.

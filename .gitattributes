@@ -1,0 +1,18 @@
+# Shell scripts must keep LF endings or they break with
+# "set: pipefail: invalid option name" when run on Linux/macOS.
+# GitHub's Windows runner checks out with autocrlf=true by default, which
+# silently rewrote install-linux.sh to CRLF and shipped it that way.
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+
+# PowerShell is happiest with CRLF.
+*.ps1       text eol=crlf
+
+# Never touch binaries.
+*.AppImage  binary
+*.png       binary
+*.jpg       binary
+*.zst       binary
+*.gz        binary
