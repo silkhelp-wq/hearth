@@ -1,0 +1,42 @@
+name: Server Release
+
+# On each version tag, package the server source into a portable tarball and
+# publish it to the PUBLIC downloads repo, so anyone can host without access
+# to the private source repo.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  package-server:
+    if: ${{ secrets.HEARTH_PUBLIC_RELEASE_TOKEN != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the portable server tarball
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          STAGE="hearth-server-${VER}"
+          mkdir -p "$STAGE"
+          cp -r server/src "$STAGE/"
+          cp server/package.json server/package-lock.json "$STAGE/"
+          cp server/channels.json "$STAGE/" 2>/dev/null || true
+          cp server/reclaim-owner.sh "$STAGE/" 2>/dev/null || true
+          cp install/server/install.sh "$STAGE/" 2>/dev/null || true
+          cp install/server/install-windows.ps1 "$STAGE/" 2>/dev/null || true
+          cp install/server/Dockerfile "$STAGE/" 2>/dev/null || true
+          cp install/server/docker-compose.yml "$STAGE/" 2>/dev/null || true
+          cp docs/SIMPLE_SETUP.md "$STAGE/README.md" 2>/dev/null || true
+          tar -czf "hearth-server-${VER}.tar.gz" "$STAGE"
+          echo "Built hearth-server-${VER}.tar.gz"
+      - name: Publish server tarball to the public downloads repo
+        uses: softprops/action-gh-release@v2
+        with:
+          repository: silkhelp-wq/hearth-releases
+          token: ${{ secrets.HEARTH_PUBLIC_RELEASE_TOKEN }}
+          tag_name: ${{ github.ref_name }}
+          files: hearth-server-*.tar.gz

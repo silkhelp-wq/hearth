@@ -22,7 +22,17 @@ esbuild.buildSync({
   // inside the bundle), minified identifiers/whitespace, no license banners.
   sourcemap: false,
   minify: true,
+  minifyIdentifiers: true,
+  minifySyntax: true,
+  minifyWhitespace: true,
   legalComments: 'none',
+  // Drop console/debugger so internal logging and any dev breadcrumbs don't
+  // ship, and collapse the code further. This is obfuscation-by-minification:
+  // it does NOT make the client 'unbreakable' (impossible for any code that
+  // runs on someone's machine) but it turns the bundle into dense, unlabeled
+  // machine-generated JS instead of readable source. See docs/deployment/DISTRIBUTION.md.
+  drop: ['debugger'],
+  pure: ['console.debug'],
   logLevel: 'info'
 });
 

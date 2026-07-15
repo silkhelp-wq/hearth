@@ -450,3 +450,29 @@ asar pinned explicitly. DIAGRAMS.md fix: mermaid dotted-edge labels
 containing dots (`-.Socket.IO signaling.->`) collide with the `-. .->` 
 delimiters; converted to pipe-label form and all 10 diagrams validated
 against mermaid 11.16.0.
+
+### Public server distribution + deeper client hardening (v0.9.0)
+
+**Server now ships publicly:** a `Server Release` workflow packages a portable
+`hearth-server-<ver>.tar.gz` (server src + lockfile + one-command installers
+for Linux/Windows/Docker + a beginner README) and publishes it to the public
+`hearth-releases` repo on every tag — anyone can host without private-repo
+access. `install/server/` holds `install.sh` (Linux, sets up a systemd user
+service), `install-windows.ps1`, `Dockerfile`, and `docker-compose.yml`.
+`npm install` on the target compiles the native modules (better-sqlite3,
+mediasoup) for that machine.
+
+**Client hardening deepened:** Electron fuses now disable `RUN_AS_NODE`, block
+`NODE_OPTIONS` injection and `--inspect` debugging of the packaged app, and
+enforce asar integrity (`onlyLoadAppFromAsar` + embedded validation — the
+archive can't be edited or swapped). Renderer minification strengthened
+(identifier/property mangling, `debugger` dropped, debug console stripped) so
+function names like `broadcastState` no longer appear in the bundle. Honest
+ceiling documented: no code running on a user's machine is truly unbreakable;
+the protections that matter (private source, zero shipped credentials,
+integrity-locked dense machine code) are in place.
+
+**Kid-level docs:** `docs/SIMPLE_SETUP.md` — plain-language, emoji-signposted
+install for the app and all three server hosting styles, written for a total
+beginner; surfaced at the top of the docs index and shipped inside the server
+tarball as its README.

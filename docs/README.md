@@ -8,6 +8,9 @@ friends — one person hosts the server, everyone else runs the desktop app.
 
 ## Start here
 
+**🟢 New to all this? → [Super Simple Setup](SIMPLE_SETUP.md)** — install the
+app and server in plain language, written so anyone can follow it.
+
 - **Just want to use it?** → [Installation Guide](install/INSTALL_GUIDE.md) —
   every OS, with the gotchas.
 - **Want to understand how it works?** → [Architecture](ARCHITECTURE.md) and the

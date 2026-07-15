@@ -57,7 +57,31 @@ table from `docs/INSTALL_CLIENT.md`) so the download page teaches installation.
 
 ---
 
-## 2. Code protection — the honest version
+## 2. Server distribution (host without the source)
+
+The server is distributed the same way as the client: a portable
+**tarball** (`hearth-server-<version>.tar.gz`) published to the public
+`hearth-releases` repo on every tagged release, via the `Server Release`
+workflow. Anyone can host without touching the private source.
+
+Inside the tarball: the server `src/`, its `package.json`/lockfile, and
+**one-command installers** for every hosting style — plus a beginner README
+(the simple setup guide). The installers:
+
+| File | For |
+|------|-----|
+| `install.sh` | Linux — home machine or VPS (sets up a background service) |
+| `install-windows.ps1` | Windows host |
+| `Dockerfile` + `docker-compose.yml` | any cloud / container host |
+
+The tarball ships **source** (the server never runs on untrusted machines —
+it lives only on the host's own box), and `npm install` on the target
+compiles the native modules (`better-sqlite3`, `mediasoup`) for that machine.
+This is the correct model for a self-hosted server: the operator gets code
+they can inspect and run, and nothing sensitive is exposed because the server
+holds no secret worth hiding — its value is in running, not in obscurity.
+
+## 3. Code protection — the honest version
 
 **Nothing shipped to a user's machine can be made impenetrable.** That is
 true of every desktop app ever shipped, and doubly true of Electron, whose
@@ -73,14 +97,31 @@ What Hearth does (v0.8.2+):
 | **Source never ships** | The repo is private; binaries are public. The strongest protection is structural: the readable source simply isn't published. |
 | **No sourcemaps** | Until v0.8.2 the bundle embedded an inline sourcemap — the entire original source, comments and all, inside every release (84% of the bundle!). Now stripped. |
 | **Minification** | Identifiers mangled, whitespace/comments gone. Reversing yields spaghetti, not source. |
-| **asar packaging** | App files ship inside an asar archive rather than loose on disk. Trivially unpackable — a tidiness layer, not security, and pinned explicitly so it can't regress. |
+| **asar + integrity** | App files ship inside an asar archive with **embedded integrity validation** (`onlyLoadAppFromAsar`, `enableEmbeddedAsarIntegrityValidation`) — the archive can't be edited or swapped without the app refusing to run. |
+| **Electron fuses** | `RUN_AS_NODE` disabled, `NODE_OPTIONS` injection blocked, `--inspect`/CLI debugging of the packaged app disabled, cookie encryption on. Closes the common runtime pry-open paths. |
 | **No secrets in builds** | With the public feed, installers carry no tokens at all. |
 
-Optional next rung (not shipped): **V8 bytecode compilation** (e.g.
-`bytenode`) compiles the JS to V8 bytecode so no JS text ships. It genuinely
-raises the reversing bar but complicates builds, debugging, and native-module
-interop, and bytecode is Node-version-pinned. Worth doing only as its own
-carefully tested release if the need is real.
+**Can it be made truly unbreakable? No — and be wary of anyone who says
+otherwise.** Every protection above raises *cost*, not certainty. The client
+runs on the user's own machine; their browser engine must be handed something
+it can execute, so a determined person with a debugger can always observe
+behavior. This is equally true of Discord, Slack, VS Code, and every other
+Electron app — none are "unbreakable," and they don't need to be.
+
+Optional next rungs (not shipped, documented for completeness):
+- **V8 bytecode** (`bytenode`) for the *main* process — compiles Node code to
+  bytecode so no JS text ships for that layer. Note it does NOT cover the
+  renderer (your UI/app logic runs in Chromium and needs real JS); it
+  complicates builds and is Node-version-pinned. Meaningful for the main
+  process only, at real cost.
+- **Commercial JS obfuscators** (e.g. control-flow flattening) for the
+  renderer — heavier scrambling than minification, at a runtime-performance
+  and debuggability cost.
+
+Neither is justified for a private friend-group app. **The protection that
+actually matters is already in place: the source repo is private, and no
+credentials ship.** What reaches users is dense, unlabeled, integrity-locked
+machine code — which is the practical ceiling for any desktop software.
 
 **Threat-model reality check:** for a private friend-group app, the assets
 worth protecting are the *server* (never distributed publicly — it lives only
@@ -89,7 +130,7 @@ studyable is a normal, acceptable property of desktop software.
 
 ---
 
-## 3. Mobile (Android / iPhone / iPad) — what it takes
+## 4. Mobile (Android / iPhone / iPad) — what it takes
 
 Three paths, in ascending cost:
 

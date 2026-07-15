@@ -1,0 +1,17 @@
+# Hearth server via Docker Compose.
+#   1. Edit HEARTH_ANNOUNCED_IP below to your server's PUBLIC IP
+#      (delete that line entirely if you use Tailscale or host at home).
+#   2. Run:  docker compose up -d
+#   3. See your claim code:  docker compose logs | grep -i "claim code"
+services:
+  hearth:
+    build: .
+    network_mode: host          # required for media/ICE — do not remove
+    environment:
+      HEARTH_ANNOUNCED_IP: 203.0.113.10   # <-- CHANGE ME (or delete for Tailscale/home)
+      HEARTH_DATA_DIR: /data
+    volumes:
+      - hearth-data:/data
+    restart: unless-stopped
+volumes:
+  hearth-data:
